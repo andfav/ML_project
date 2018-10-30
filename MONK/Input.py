@@ -72,7 +72,35 @@ class Input(object):
         for attr in self.vector:
             attr.Print()
 
+class TRInput(Input):
 
+    def __init__(self, attributeList: list, target: bool):
+        if len(attributeList) <= 0:
+            raise ValueError ("length of attribute list must be greater than 0")
+
+        self.vector = list()
+
+        for attribute in attributeList:
+            if isinstance(attribute, Attribute):
+                i = 0
+                check = False
+                while i < len(attribute.represention) and not check:
+                    if attribute.represention[i]:
+                        attr = Attribute(len(attribute.represention), i+1)
+                        check = True
+                        self.vector.append(attr)
+                    i += 1
+                
+            else:
+                raise ValueError ("attributeList must be a list of element of class Attribute")
+
+        self.target = target
+
+    def Print(self):
+        for attr in self.vector:
+            attr.Print()
+
+        print("target "+ str(self.target))
 
 #{"blue", "green", "red"}
 a1 = Attribute(3, 2)

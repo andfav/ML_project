@@ -27,8 +27,8 @@ class Unit(object):
         if len(inp) == self.dim:
             s = 0
             for el in inp:
-                if not isinstance(el,int):
-                    raise RuntimeError ("getNet: passed non-int input element.")
+                if not isinstance(el,(int,float)):
+                    raise RuntimeError ("getNet: passed non-number input element.")
                 i = inp.index(el)
                 s += self.weights[i]*el
             return s
@@ -71,7 +71,7 @@ class NeuralNetwork(object):
                     'ValMax':      0.2,
                     'HiddenLayers': 1,
                     'HiddenUnits':  2,
-                    'OutputUnits':  1, 
+                    'OutputUnits':  15, 
                     'ActivFun': lambda x: 1/(1+(exp(-x)))}
 
         #Aggiornamento degli iperparametri.
@@ -129,8 +129,7 @@ class NeuralNetwork(object):
 
             #Calcolo gli outputs delle unità sui layers successivi.
             for i in range(1,l+1):
-                newValList = [unit.getOutput(valList,f) for unit in self.getLayer(i)]
-                valList = newValList
+                valList = [unit.getOutput(valList,f) for unit in self.getLayer(i)]
             return valList
         else:
             raise RuntimeError ("getLayerOutput: no layer l found.")

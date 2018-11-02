@@ -11,65 +11,47 @@ from Input import Attribute, Input, TRInput
 # distinto nei due casi sopra citati) si demanda ad opportune sottoclassi.
 class Unit(object):
 
-    def __init__(self, pos : int, dim : int, ValMax : float, prevLayer : list, f):
+    def __init__(self, pos : int, dim : int, ValMax : float):
         from random import uniform
         #Inizializzazione dei pesi a valori casuali (distr. uniforme).
         self.weights = [uniform(0,ValMax) for i in range(dim)]
 
         #Memorizzazione della posizione nel layer corrente, del numero di connessioni 
-        # al layer precedente, di copia del layer (lista) precedente, della funzione di attivazione.
+        # al layer precedente.
         self.pos = pos
         self.dim = dim
-        self.prevLayer = prevLayer
-        self.activation = f
     
     #Restituisce il Net (somma pesata dei valori in ingresso all'unità) calcolato a partire
-    #dall'input di rete inp.
-    def getNet(self, inp: Input):
-        s = 0
-        if self.pos == 1:
-            if inp.getLength() == self.dim:
-                for i in range(inp.getLength()):
-                    s += self.weights[i]*inp.getValue(i)
-            else:
-                raise ValueError ("Inserted input is not valid for this NN!")
+    #dall'input dell'unità inp.
+    def getNet(self, inp : list):
+        if len(inp) == self.dim:
+            s = 0
+            for el in inp:
+                i = inp.index(el)
+                s += self.weights[i]*el
+            return s
         else:
-            for unit in self.prevLayer:
-                i = self.prevLayer.index(unit)
-                s += self.weights[i]*unit.getOutput(inp)
-        return s
+            raise RuntimeError ("getNet: numbers of weights and inputs don't match.")
 
     #Restituisce l'ouput calcolato sull'unità corrente (Net valutato nella funzione di
     # attivazione).
-    def getOutput(self, inp: Input):
-        return(self.activation(self.getNet(inp)))
+    def getOutput(self, inp: list, f):
+        return(f(self.getNet(inp)))
 
 #Sottoclasse delle unità hidden.
 class HiddenUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax, network, f):
-        super().__init__(pos,dim,ValMax,network,f)
+    def __init__(self, pos, dim, ValMax):
+        super().__init__(pos,dim,ValMax)
 
-        # Inizializzo il layer successivo necessario al calcolo del delta.
-        self.succLayer = []
-
-    #Metodo che aggiunge il layer successivo. Per il fatto che il layer
-    #successivo non esiste ancora in fase di inizializzazione dell'unità corrente
-    #risulta necessario fare tale aggiunta in un momento successivo.
-    def addSuccLayer(self, succLayer):
-        self.succLayer = succLayer
-    
     def getDelta(self):
-        if len(self.succLayer) > 0:
-            raise NotImplementedError
-        else:
-            raise RuntimeError ("A hidden unit has not constructed correctly: succLayer missing!")
+        raise NotImplementedError
 
 #Sottoclasse delle unità di output.
 class OutputUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax, network, f):
-        super().__init__(pos,dim,ValMax,network,f)
+    def __init__(self, pos, dim, ValMax):
+        super().__init__(pos,dim,ValMax)
     
     def getDelta(self):
         raise NotImplementedError
@@ -101,7 +83,7 @@ class NeuralNetwork(object):
         self.layers = []
         self.noHiddLayers = self.hyp['HiddenLayers']
 
-        #Inserimento in del training set.
+        #Inserimento del training set.
         if len(trainingSet) == 0 or not isinstance(trainingSet[0], TRInput):
             raise ValueError ("inserted TR set is not valid!")
         else:
@@ -112,32 +94,14 @@ class NeuralNetwork(object):
             self.layers.append(trainingSet.copy())
 
         #Creazione delle hidden units.
-        #Costruzione del primo hidden layer: assumiamo che prevLayer = [] (il metodo getNet controlla
-        # infatti pos e assume un comportamento diverso qualora pos==1).
-        hiddenList = []
-        for i in range(self.hyp['HiddenUnits']):
-            hiddenList.append(HiddenUnit(1,length,self.hyp['ValMax'],[],self.hyp['ActivFun']))
-        self.layers.append(hiddenList)
-        length = len(hiddenList)
-        #Costruzione degli hidden layers successivi (se esistono).
-        for j in range(1,self.noHiddLayers):
-            hiddenList = []
-            for i in range(self.hyp['HiddenUnits']):
-                hiddenList.append(HiddenUnit(j+1,length,self.hyp['ValMax'],self.getLayer(j),self.hyp['ActivFun']))
+        for j in range(self.noHiddLayers):
+            hiddenList = [HiddenUnit(j+1,length,self.hyp['ValMax']) for i in range(self.hyp['HiddenUnits'])]
             self.layers.append(hiddenList)
             length = len(hiddenList)
-            #Inserimento del succLayer nelle unità del layer precedente.
-            for unit in self.getLayer(j):
-                unit.addSuccLayer(self.getLayer(j+1))
 
         #Creazione delle output units.
-        outputList = []
-        for i in range(self.hyp['OutputUnits']):
-                outputList.append(OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax'],self.getLayer(self.noHiddLayers),self.hyp['ActivFun']))
+        outputList = [OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax']) for i in range(self.hyp['OutputUnits'])]
         self.layers.append(outputList)
-        #Inserimento del succLayer nelle unità del layer precedente (hidden).
-        for unit in self.getLayer(self.noHiddLayers):
-            unit.addSuccLayer(self.getLayer(self.noHiddLayers+1))
 
     #Esegue backpropagation e istruisce la rete settando i pesi.
     def learn(self):
@@ -153,13 +117,26 @@ class NeuralNetwork(object):
         else:
             raise RuntimeError ("Index i out of bounds.")
 
-    #Restituisce la lista degli output di rete dato un input.
-    def getOutput(self, inp : Input):
-        out_list = []
-        for outnode in self.layers[len(self.layers)-1]:
-            out_list.append(outnode.getOutput(inp))
-        return out_list
+    #Restituisce la lista degli output al layer l, dato l'input inp e la 
+    #funzione f.
+    #Nota: usa f = lambda x : x per la lista dei net al layer l.
+    def getLayerOutput(self, inp : Input, l : int, f):
+        if l in range(1,len(self.layers)):
+            #Da inp costruisco la corrispondente lista di interi.
+            valList = [inp.getValue(i) for i in range(inp.getLength())]
+
+            #Calcolo gli outputs delle unità sui layers successivi.
+            for i in range(1,l+1):
+                newValList = [unit.getOutput(valList,f) for unit in self.getLayer(i)]
+                valList = newValList
+            return valList
+        else:
+            raise RuntimeError ("getLayerOutput: no layer l found.")
     
+    #Resituisce la lista degli output di rete (lista dei valori nelle unità di output) dato l'input inp.
+    def getOutput(self, inp : Input):
+        return self.getLayerOutput(inp,len(self.layers)-1, self.hyp['ActivFun'])
+        
     #Calcola l'errore (rischio) empirico della lista di TRInput data, sulla i-esima
     #unità di output (Att: i va da 0 ad OutputUnits-1!) con la regola dei LS riscalata
     #per il fattore k. Ad es. k=1/len(data) da' LMS.

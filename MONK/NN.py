@@ -160,7 +160,7 @@ class NeuralNetwork(object):
             s += (d.getTarget() - self.getOutput(d)[i])**2
         return k*s
 
-
+"""
 #Test.
 a1=Attribute(5,3)
 a2=Attribute(4,2)
@@ -178,4 +178,5 @@ print(n.getOutput(i2))
 print(n.getError([i2],0,1))
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
+"""
 

@@ -27,6 +27,8 @@ class Unit(object):
         if len(inp) == self.dim:
             s = 0
             for el in inp:
+                if not isinstance(el,int):
+                    raise RuntimeError ("getNet: passed non-int input element.")
                 i = inp.index(el)
                 s += self.weights[i]*el
             return s

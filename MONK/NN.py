@@ -118,24 +118,17 @@ class NeuralNetwork(object):
             return self.layers[i].copy()
         else:
             raise RuntimeError ("Index i out of bounds.")
-
-    #Restituisce la lista degli output al layer l, dato l'input inp e la 
-    #funzione f.
-    def getLayerOutput(self, inp : Input, l : int, f):
-        if l in range(1,len(self.layers)):
-            #Da inp costruisco la corrispondente lista di interi.
-            valList = [inp.getValue(i) for i in range(inp.getLength())]
-
-            #Calcolo gli outputs delle unità sui layers successivi.
-            for i in range(1,l+1):
-                valList = [unit.getOutput(valList,f) for unit in self.getLayer(i)]
-            return valList
-        else:
-            raise RuntimeError ("getLayerOutput: no layer l found.")
     
-    #Resituisce la lista degli output di rete (lista dei valori nelle unità di output) dato l'input inp.
+    #Resituisce la lista degli output di rete (lista dei valori uscenti dalle unità di output) dato l'input inp.
     def getOutput(self, inp : Input):
-        return self.getLayerOutput(inp,len(self.layers)-1, self.hyp['ActivFun'])
+        #Da inp costruisco la corrispondente lista di interi.
+        valList = [inp.getValue(i) for i in range(inp.getLength())]
+
+        #Calcolo gli outputs delle unità sui layers successivi.
+        for i in range(1,len(self.layers)):
+            valList = [unit.getOutput(valList,self.hyp['ActivFun']) for unit in self.getLayer(i)]
+        return valList
+        
         
     #Calcola l'errore (rischio) empirico della lista di TRInput data, sulla i-esima
     #unità di output (Att: i va da 0 ad OutputUnits-1!) con la regola dei LS riscalata
@@ -160,7 +153,7 @@ class NeuralNetwork(object):
             s += (d.getTarget() - self.getOutput(d)[i])**2
         return k*s
 
-"""
+
 #Test.
 a1=Attribute(5,3)
 a2=Attribute(4,2)
@@ -178,5 +171,4 @@ print(n.getOutput(i2))
 print(n.getError([i2],0,1))
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
-"""
 

@@ -37,6 +37,17 @@ class Attribute(object):
             if value == 1:
                 return dom[self.represention.index(value)]
 
+    #interfacing: restituisce il numero di valori distinti che l'attributo corrente puo' assumere
+    def getLength(self):
+            return len(self.represention)
+
+    #interfacing: restituisce il valore 0-1 dell'attributo in posizione interna i nella codifica 1-of-k
+    def getValue(self, i: int):
+            if i < 0 or i >= len(self.represention):
+                raise ValueError ("Index i out of bounds")
+            else:
+                return self.represention[i]
+
     def Print(self):
         string = ""
         for elem in self.represention:
@@ -67,40 +78,52 @@ class Input(object):
                 
             else:
                 raise ValueError ("attributeList must be a list of element of class Attribute")
+    
+    #interfacing: restituisce il numero di variabili 0-1 distinte dell'Input corrente
+    def getLength(self):
+        s = 0
+        for attr in self.vector:
+            s += attr.getLength()
+        return s
+
+    #interfacing: restituisce il valore 0-1 memorizzato in posizione i dell'Input corrente
+    #ACHTUNG: i in (0,length-1)!!
+    def getValue(self, i: int):
+        if i >= 0 and i < self.getLength():
+            j = i
+            l = 0
+            check = False
+            while check == False:
+                if j in range(0,self.vector[l].getLength()):
+                    check = True
+                    return self.vector[l].getValue(j)
+                else:
+                    j -= self.vector[l].getLength()
+                    l += 1
+        else:
+            raise ValueError("Index i out of bounds")
 
     def Print(self):
         for attr in self.vector:
             attr.Print()
 
+#Sottoclasse degli input completi di target: ideali per TR, VS.
 class TRInput(Input):
-
     def __init__(self, attributeList: list, target: bool):
-        if len(attributeList) <= 0:
-            raise ValueError ("length of attribute list must be greater than 0")
-
-        self.vector = list()
-
-        for attribute in attributeList:
-            if isinstance(attribute, Attribute):
-                i = 0
-                check = False
-                while i < len(attribute.represention) and not check:
-                    if attribute.represention[i]:
-                        attr = Attribute(len(attribute.represention), i+1)
-                        check = True
-                        self.vector.append(attr)
-                    i += 1
-                
-            else:
-                raise ValueError ("attributeList must be a list of element of class Attribute")
-
+        super().__init__(attributeList)
         self.target = target
+
+    #interfacing: restituisce il target associato all'input corrente.
+    def getTarget(self):
+        return self.target
 
     def Print(self):
         for attr in self.vector:
             attr.Print()
 
         print("target "+ str(self.target))
+
+
 
 #{"blue", "green", "red"}
 a1 = Attribute(3, 2)
@@ -115,5 +138,32 @@ attrList = [a1, a2]
 input1 = Input(attrList)
 
 input1.Print()
+
+print(input1.getValue(0)==0)
+print(input1.getValue(1)==1)
+print(input1.getValue(2)==0)
+print(input1.getValue(3)==1)
+print(input1.getValue(4)==0)
+print(input1.getValue(5)==1)
+print(input1.getValue(6)==1)
+
+input2 = TRInput(attrList,True)
+input2.Print()
+
+# Output atteso:
+# green
+# 1
+# 010
+# 0010
+# True
+# True
+# True
+# False
+# True
+# True
+# False
+# 010
+# 0010
+# target True
 
 

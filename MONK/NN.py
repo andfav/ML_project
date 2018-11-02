@@ -121,7 +121,6 @@ class NeuralNetwork(object):
 
     #Restituisce la lista degli output al layer l, dato l'input inp e la 
     #funzione f.
-    #Nota: usa f = lambda x : x per la lista dei net al layer l.
     def getLayerOutput(self, inp : Input, l : int, f):
         if l in range(1,len(self.layers)):
             #Da inp costruisco la corrispondente lista di interi.

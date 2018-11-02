@@ -71,7 +71,7 @@ class NeuralNetwork(object):
                     'ValMax':      0.2,
                     'HiddenLayers': 1,
                     'HiddenUnits':  2,
-                    'OutputUnits':  15, 
+                    'OutputUnits':  1, 
                     'ActivFun': lambda x: 1/(1+(exp(-x)))}
 
         #Aggiornamento degli iperparametri.

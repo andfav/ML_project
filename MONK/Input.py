@@ -27,6 +27,16 @@ class Attribute(object):
             else:
                 self.represention.append(False)
 
+    def Copy(self):
+        cardinality = len(self.represention)
+        i = 0
+        value : bool
+        while i < len(self.represention):
+            if self.represention[i]:
+                value = i + 1
+            i += 1
+        return Attribute(cardinality, value)
+
     #restituisce il valore corrispondente a value all'interno del dominio
     #es. se representation = 010 ==> Decode(["blue", "green", "red"]) restituisce la stringa "green"
     def Decode(self, dom: list):
@@ -107,6 +117,13 @@ class Input(object):
         for attr in self.vector:
             attr.Print()
 
+    def Copy(self):
+        attrList = list()
+        for att in self.vector:
+            attrList.append(att.Copy())
+
+        return Input(attrList)
+
 #Sottoclasse degli input completi di target: ideali per TR, VS.
 class TRInput(Input):
     def __init__(self, attributeList: list, target: bool):
@@ -123,8 +140,16 @@ class TRInput(Input):
 
         print("target "+ str(self.target))
 
+    def Copy(self):
+        attrList = list()
+        for att in self.vector:
+            
+            attrList.append(att.Copy())
+
+        return TRInput(attrList, self.target)
 
 
+"""
 #{"blue", "green", "red"}
 a1 = Attribute(3, 2)
 print(str(a1.Decode(["blue", "green", "red"])))
@@ -150,6 +175,12 @@ print(input1.getValue(6)==1)
 input2 = TRInput(attrList,True)
 input2.Print()
 
+
+input3 = input2
+print(input2 == input3)
+
+input3 = input2.Copy()
+print(input2 == input3)
 # Output atteso:
 # green
 # 1
@@ -166,4 +197,4 @@ input2.Print()
 # 0010
 # target True
 
-
+"""

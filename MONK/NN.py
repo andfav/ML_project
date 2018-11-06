@@ -2,6 +2,7 @@
 Classi Unit e NeuralNetwork che implementano il nostro modello di rete neurale,
 in particolare è utilizzato un algoritmo di apprendimento backpropagation di tipo
 batch.
+Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
 from Input import Attribute, Input, TRInput
 
@@ -10,51 +11,49 @@ from Input import Attribute, Input, TRInput
 # distinto nei due casi sopra citati) si demanda ad opportune sottoclassi.
 class Unit(object):
 
-    def __init__(self, pos : int, dim : int, ValMax : float, network : object, f):
+    def __init__(self, pos : int, dim : int, ValMax : float):
         from random import uniform
         #Inizializzazione dei pesi a valori casuali (distr. uniforme).
         self.weights = [uniform(0,ValMax) for i in range(dim)]
 
-        #Memorizzazione del layer corrente, del numero di connessioni al layer precedente,
-        #della rete neurale relativa all'unità, della funzione di attivazione.
+        #Memorizzazione della posizione nel layer corrente, del numero di connessioni 
+        # al layer precedente.
         self.pos = pos
         self.dim = dim
-        self.net = network
-        self.activation = f
     
     #Restituisce il Net (somma pesata dei valori in ingresso all'unità) calcolato a partire
-    #dall'input di rete inp.
-    def getNet(self, inp: Input):
-        s = 0
-        if self.pos == 1:
-            for i in range(inp.getLength()):
-                i = self.net.getLayer(0).index(inp)
-                s += self.weights[i]*inp.getValue(i)
+    #dall'input dell'unità inp.
+    def getNet(self, inp : list):
+        if len(inp) == self.dim:
+            s = 0
+            for el in inp:
+                if not isinstance(el,(int,float)):
+                    raise RuntimeError ("getNet: passed non-number input element.")
+                i = inp.index(el)
+                s += self.weights[i]*el
+            return s
         else:
-            for unit in self.net.getLayer(self.pos-1):
-                i = self.net.getLayer(self.pos-1).index(unit)
-                s += self.weights[i]*unit.getOutput(inp)
-        return s
+            raise RuntimeError ("getNet: numbers of weights and inputs don't match.")
 
     #Restituisce l'ouput calcolato sull'unità corrente (Net valutato nella funzione di
     # attivazione).
-    def getOutput(self, inp: Input):
-        return(self.activation(self.getNet(inp)))
+    def getOutput(self, inp: list, f):
+        return(f(self.getNet(inp)))
 
 #Sottoclasse delle unità hidden.
 class HiddenUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax, network, f):
-        super().__init__(pos,dim,ValMax,network,f)
-    
+    def __init__(self, pos, dim, ValMax):
+        super().__init__(pos,dim,ValMax)
+
     def getDelta(self):
         raise NotImplementedError
 
 #Sottoclasse delle unità di output.
 class OutputUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax, network, f):
-        super().__init__(pos,dim,ValMax,network,f)
+    def __init__(self, pos, dim, ValMax):
+        super().__init__(pos,dim,ValMax)
     
     def getDelta(self):
         raise NotImplementedError
@@ -70,8 +69,9 @@ class NeuralNetwork(object):
                     'alpha':       0.1,
                     'lambda':      0.1,
                     'ValMax':      0.2,
-                    'HiddenUnits': 2,
-                    'OutputUnits': 1, 
+                    'HiddenLayers': 1,
+                    'HiddenUnits':  2,
+                    'OutputUnits':  1, 
                     'ActivFun': lambda x: 1/(1+(exp(-x)))}
 
         #Aggiornamento degli iperparametri.
@@ -81,10 +81,11 @@ class NeuralNetwork(object):
             else:
                 raise ValueError ("new_hyp must be a subdict of hyp!")
 
-        #Lista dei layers.
+        #Lista dei layers e numero degli hidden layers.
         self.layers = []
+        self.noHiddLayers = self.hyp['HiddenLayers']
 
-        #Inserimento in input del training set.
+        #Inserimento del training set.
         if len(trainingSet) == 0 or not isinstance(trainingSet[0], TRInput):
             raise ValueError ("inserted TR set is not valid!")
         else:
@@ -95,20 +96,21 @@ class NeuralNetwork(object):
             self.layers.append(trainingSet.copy())
 
         #Creazione delle hidden units.
-        hiddenList = []
-        for i in range(self.hyp['HiddenUnits']):
-                hiddenList.append(HiddenUnit(1,length,self.hyp['ValMax'],self,self.hyp['ActivFun']))
-        self.layers.append(hiddenList)
+        for j in range(self.noHiddLayers):
+            hiddenList = [HiddenUnit(j+1,length,self.hyp['ValMax']) for i in range(self.hyp['HiddenUnits'])]
+            self.layers.append(hiddenList)
+            length = len(hiddenList)
 
         #Creazione delle output units.
-        outputList = []
-        for i in range(self.hyp['OutputUnits']):
-                outputList.append(OutputUnit(2,len(hiddenList),self.hyp['ValMax'],self,self.hyp['ActivFun']))
+        outputList = [OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax']) for i in range(self.hyp['OutputUnits'])]
         self.layers.append(outputList)
 
     #Esegue backpropagation e istruisce la rete settando i pesi.
     def learn(self):
-        raise NotImplementedError
+        if self.noHiddLayers == 1:
+            raise NotImplementedError
+        else:
+            raise NotImplementedError ("Deep learning models not already implemented.")
     
     #Restituisce copia della lista rappresentante il layer i-esimo.
     def getLayer(self,i):
@@ -116,14 +118,18 @@ class NeuralNetwork(object):
             return self.layers[i].copy()
         else:
             raise RuntimeError ("Index i out of bounds.")
-
-    #Restituisce la lista degli output di rete dato un input.
-    def getOutput(self, inp : Input):
-        out_list = []
-        for outnode in self.layers[2]:
-            out_list.append(outnode.getOutput(inp))
-        return out_list
     
+    #Resituisce la lista degli output di rete (lista dei valori uscenti dalle unità di output) dato l'input inp.
+    def getOutput(self, inp : Input):
+        #Da inp costruisco la corrispondente lista di interi.
+        valList = [inp.getValue(i) for i in range(inp.getLength())]
+
+        #Calcolo gli outputs delle unità sui layers successivi.
+        for i in range(1,len(self.layers)):
+            valList = [unit.getOutput(valList,self.hyp['ActivFun']) for unit in self.getLayer(i)]
+        return valList
+        
+        
     #Calcola l'errore (rischio) empirico della lista di TRInput data, sulla i-esima
     #unità di output (Att: i va da 0 ad OutputUnits-1!) con la regola dei LS riscalata
     #per il fattore k. Ad es. k=1/len(data) da' LMS.
@@ -155,10 +161,14 @@ i1=TRInput([a1,a2],False)
 
 a1=Attribute(5,1)
 a2=Attribute(4,3)
+a3=Attribute(2,1)
 i2=TRInput([a1,a2],True)
+i3=Input([a1,a2,a3])
 
 il=[i1,i2]
 n = NeuralNetwork(il)
-print(n.getOutput(i1))
+print(n.getOutput(i2))
 print(n.getError([i2],0,1))
+#ValueError: Inserted input is not valid for this NN!
+#n.getOutput(i3)
 

@@ -51,13 +51,6 @@ class Attribute(object):
     def getLength(self):
             return len(self.represention)
 
-    #interfacing: restituisce il valore 0-1 dell'attributo in posizione interna i nella codifica 1-of-k
-    def getValue(self, i: int):
-            if i < 0 or i >= len(self.represention):
-                raise ValueError ("Index i out of bounds")
-            else:
-                return self.represention[i]
-
     #restituisce il valore intero corrispendente alla codifica 1-of-k
     def toInt(self):
         return self.represention.index(1) + 1

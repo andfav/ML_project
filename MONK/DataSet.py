@@ -75,11 +75,11 @@ class DataSet(object):
 
 
     #restituisce la lista degli input
-    def GetInputs(self):
+    def getInputs(self):
         inputs = list()
 
         for inp in self.inputList:
-            inputs.append(inp.Copy())
+            inputs.append(inp.copy())
 
         return inputs
 
@@ -87,8 +87,8 @@ class DataSet(object):
 domains = [0, 3, 3, 2, 3, 4, 2, -1]
 dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", True, domains)
 
-for elem in dati.GetInputs():
-    elem.Print()
+for elem in dati.getInputs():
+    elem.print()
 
 skipRow = list()
 
@@ -98,5 +98,5 @@ for i in range(2,432):
 dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", True, domains, skipRow)
 
 print("prova skip")
-for elem in dati.GetInputs():
-    elem.Print()
+for elem in dati.getInputs():
+    elem.print()

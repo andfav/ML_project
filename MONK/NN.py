@@ -45,7 +45,9 @@ class Unit(object):
     #Restituisce l'ouput calcolato sull'unità corrente (Net valutato nella funzione di
     # attivazione).
     def getOutput(self, inp: list):
-        return(self.f(self.getNet(inp)))
+        net = self.getNet(inp)
+        fval = self.f(net)
+        return fval
 
 #Sottoclasse delle unità hidden.
 class HiddenUnit(Unit):
@@ -115,9 +117,9 @@ class NeuralNetwork(object):
         if len(trainingSet) == 0 or not isinstance(trainingSet[0], TRInput):
             raise ValueError ("inserted TR set is not valid!")
         else:
-            length = trainingSet[0].len()
+            length = trainingSet[0].getLength()
             for el in trainingSet:
-                if not isinstance(el, TRInput) or el.len() != length:
+                if not isinstance(el, TRInput) or el.getLength() != length:
                     raise ValueError ("TR set not valid: not homogeneous")
             self.layers.append(trainingSet.copy())
 
@@ -149,8 +151,9 @@ class NeuralNetwork(object):
     def getOutput(self, inp : Input):
         #Da inp costruisco la corrispondente lista di interi.
         valList = list()
-        for i in range(inp.len()):
-            valList.append(inp.get(i).toInt())
+        l = inp.getInput()
+        for i in range(len(l)):
+            valList.append(int(l[i]))
 
         #Calcolo gli outputs delle unità sui layers successivi.
         for i in range(1,len(self.layers)):
@@ -166,9 +169,9 @@ class NeuralNetwork(object):
         if len(data) == 0 or not isinstance(data[0], TRInput):
             raise ValueError ("inserted set is not valid!")
         else:
-            length = data[0].len()
+            length = data[0].getLength()
             for el in data:
-                if not isinstance(el, TRInput) or el.len() != length:
+                if not isinstance(el, TRInput) or el.getLength() != length:
                     raise ValueError ("data set not valid: not homogeneous")
 
         #Controllo di validità dell'indice i.
@@ -200,16 +203,67 @@ out = n.getOutput(i2)
 print(out)
 print(n.getError([i2],0,1))
 
-derivative = lambda x: x*2
-f = lambda x: x**2
-outUnit = OutputUnit(1, 2, 0.2, f)
-onet = outUnit.getNet([1,1])
-outputDelta = outUnit.getDelta(1, derivative, [1, 1])
+#prova con perceptron
+def perceptron(x): 
+    return int(x >= 0.5)
+
+f = derivative = perceptron
+
+
+l = i2.getInput()
+linp = list()
+for el in l:
+    linp.append(int(el))
+print("\n\n\n*****************\nPerceptron")
+print("input: "+str(linp)) 
+
+outUnit = OutputUnit(1, 1, 0.2, f)
+hiddenUnit = HiddenUnit(1, len(linp), 0.2, f)
+
+hout = list()
+hout.append(hiddenUnit.getOutput(linp))
+onet = outUnit.getNet(hout)
+outputOut = outUnit.getOutput(hout)
+outputDelta = outUnit.getDelta(1, derivative, hout)
+
 print("output delta:" +str(outputDelta))
-hiddenUnit = HiddenUnit(1, 2, 0.2, f)
-hnet = hiddenUnit.getNet([1, 1])
-hiddenDelta = hiddenUnit.getDelta(derivative, [1, 1], [outputDelta], [1])
+hnet = hiddenUnit.getNet(linp)
+hiddenDelta = hiddenUnit.getDelta(derivative, linp, [outputDelta], [1])
 print("hidden delta:" +str(hiddenDelta))
+print("**********************************")
+#
+
+#prova con sigmoid
+def sigmoid(x): 
+    return 1/(1+(exp(-x)))
+
+f =  sigmoid
+
+derivative = lambda x: exp(-x)/((1+exp(-x))**2)
+
+l = i2.getInput()
+linp = list()
+for el in l:
+    linp.append(int(el))
+print("\n\n\n\nsigmoid")
+print("input: "+str(linp)) 
+
+outUnit = OutputUnit(1, 1, 0.2, f)
+hiddenUnit = HiddenUnit(1, len(linp), 0.2, f)
+
+hout = list()
+hout.append(hiddenUnit.getOutput(linp))
+onet = outUnit.getNet(hout)
+outputOut = outUnit.getOutput(hout)
+outputDelta = outUnit.getDelta(1, derivative, hout)
+
+print("output delta:" +str(outputDelta))
+hnet = hiddenUnit.getNet(linp)
+hiddenDelta = hiddenUnit.getDelta(derivative, linp, [outputDelta], [1])
+print("hidden delta:" +str(hiddenDelta))
+#
+
+
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
 

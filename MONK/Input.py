@@ -51,9 +51,12 @@ class Attribute(object):
     def getLength(self):
             return len(self.represention)
 
-    #restituisce il valore intero corrispendente alla codifica 1-of-k
-    def toInt(self):
-        return self.represention.index(1) + 1
+    #interfacing: restituisce il valore 0-1 dell'attributo in posizione interna i nella codifica 1-of-k
+    def getValue(self, i: int):
+            if i < 0 or i >= len(self.represention):
+                raise ValueError ("Index i out of bounds")
+            else:
+                return self.represention[i]
 
     def print(self):
         string = ""
@@ -131,6 +134,13 @@ class Input(object):
 
         return self.vector[index]
 
+    #restituisce un'unica lista contenente l'input codificato
+    def getInput(self):
+        l = list()
+        for attribute in self.vector:
+            l = l + attribute.copy().represention
+        return l
+
 #Sottoclasse degli input completi di target: ideali per TR, VS.
 class TRInput(Input):
     def __init__(self, attributeList: list, target: bool):
@@ -167,7 +177,6 @@ class TRInput(Input):
 a1 = Attribute(3, 2)
 print(str(a1.decode(["blue", "green", "red"])))
 
-print(str(a1.toInt()))
 
 #{-1, 0, 1, 2}
 a2 = Attribute(4, 3)
@@ -196,6 +205,12 @@ print(input2 == input3)
 
 input3 = input2.copy()
 print(input2 == input3)
+
+inp = input3.getInput()
+l = list()
+for elem in inp:
+    l.append(int(elem))
+print("input :"+ str(l))
 # Output atteso:
 # green
 # 1

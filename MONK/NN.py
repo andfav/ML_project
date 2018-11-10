@@ -21,7 +21,7 @@ class Unit(object):
         self.weights = [uniform(0,ValMax) for i in range(dim)]
 
         #Memorizzazione della posizione nel layer corrente, del numero di connessioni 
-        # al layer precedente.
+        # al layer precedente, della funzione di attivazione.
         self.pos = pos
         self.dim = dim
         self.f = f
@@ -56,11 +56,11 @@ class HiddenUnit(Unit):
         super().__init__(pos,dim,ValMax,f)
 
     #costruisce il delta da usare nell'algoritmo di backpropagation
-    #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
     #input: input passato all'unità
     #deltaList: lista dei delta ottenuti al livello soprastante
     #weightsList: lista dei pesi che si riferiscono all'unità 
-    def getDelta(self, derivative, input:list, deltaList:list, weightsList:list):
+    def getDelta(self, input:list, deltaList:list, weightsList:list):
+        from scipy.misc import derivative
         s = 0
 
         #Sommatoria(DELTAk * Wkj)
@@ -68,7 +68,7 @@ class HiddenUnit(Unit):
             s += deltaList[i]*weightsList[i]
 
         net = self.getNet(input)
-        dx = derivative(net)
+        dx = derivative(self.f,net)
         return s*dx
 
 #Sottoclasse delle unità di output.
@@ -79,10 +79,10 @@ class OutputUnit(Unit):
     
     #costruisce il delta da usare nell'algoritmo di backpropagation
     #targetOut: valore di target che associato all'input
-    #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
     #input: input passato all'unità
-    def getDelta(self, targetOut, derivative, input:list):
-        return (targetOut - self.getOutput(input))*derivative(self.getNet(input))
+    def getDelta(self, targetOut, input:list):
+        from scipy.misc import derivative
+        return (targetOut - self.getOutput(input))*derivative(self.f,self.getNet(input))
         
 
 
@@ -207,9 +207,6 @@ print(n.getError([i2],0,1))
 def perceptron(x): 
     return int(x >= 0.5)
 
-f = derivative = perceptron
-
-
 l = i2.getInput()
 linp = list()
 for el in l:
@@ -224,11 +221,11 @@ hout = list()
 hout.append(hiddenUnit.getOutput(linp))
 onet = outUnit.getNet(hout)
 outputOut = outUnit.getOutput(hout)
-outputDelta = outUnit.getDelta(1, derivative, hout)
+outputDelta = outUnit.getDelta(1, hout)
 
 print("output delta:" +str(outputDelta))
 hnet = hiddenUnit.getNet(linp)
-hiddenDelta = hiddenUnit.getDelta(derivative, linp, [outputDelta], [1])
+hiddenDelta = hiddenUnit.getDelta(linp, [outputDelta], [1])
 print("hidden delta:" +str(hiddenDelta))
 print("**********************************")
 #
@@ -238,8 +235,6 @@ def sigmoid(x):
     return 1/(1+(exp(-x)))
 
 f =  sigmoid
-
-derivative = lambda x: exp(-x)/((1+exp(-x))**2)
 
 l = i2.getInput()
 linp = list()
@@ -255,11 +250,11 @@ hout = list()
 hout.append(hiddenUnit.getOutput(linp))
 onet = outUnit.getNet(hout)
 outputOut = outUnit.getOutput(hout)
-outputDelta = outUnit.getDelta(1, derivative, hout)
+outputDelta = outUnit.getDelta(1, hout)
 
 print("output delta:" +str(outputDelta))
 hnet = hiddenUnit.getNet(linp)
-hiddenDelta = hiddenUnit.getDelta(derivative, linp, [outputDelta], [1])
+hiddenDelta = hiddenUnit.getDelta(linp, [outputDelta], [1])
 print("hidden delta:" +str(hiddenDelta))
 #
 

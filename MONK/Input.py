@@ -27,7 +27,7 @@ class Attribute(object):
             else:
                 self.represention.append(False)
 
-    def Copy(self):
+    def copy(self):
         cardinality = len(self.represention)
         i = 0
         value : bool
@@ -39,7 +39,7 @@ class Attribute(object):
 
     #restituisce il valore corrispondente a value all'interno del dominio
     #es. se representation = 010 ==> Decode(["blue", "green", "red"]) restituisce la stringa "green"
-    def Decode(self, dom: list):
+    def decode(self, dom: list):
         if len(dom) != len(self.represention):
             raise ValueError ("dom lenght must be equal to attribute cardinality")
 
@@ -58,7 +58,7 @@ class Attribute(object):
             else:
                 return self.represention[i]
 
-    def Print(self):
+    def print(self):
         string = ""
         for elem in self.represention:
             if elem:
@@ -66,6 +66,13 @@ class Attribute(object):
             else:
                 string += str(0)
         print(string)
+
+    #restituisce la rappresentaziione come lista di interi
+    def toInt(self):
+        l = list()
+        for elem in self.represention:
+            l.append(int(elem))
+        return l
 
 class Input(object):
 
@@ -96,6 +103,16 @@ class Input(object):
             s += attr.getLength()
         return s
 
+    def len(self):
+        return len(self.vector)
+
+    #retituisce una lista di interi che è la codifica 1-of-k di tutti gli attributi dell'input
+    def toInt(self):
+        l = list()
+        for attr in self.vector:
+            l.append(attr.toInt())
+        return l
+
     #interfacing: restituisce il valore 0-1 memorizzato in posizione i dell'Input corrente
     #ACHTUNG: i in (0,length-1)!!
     def getValue(self, i: int):
@@ -113,16 +130,30 @@ class Input(object):
         else:
             raise ValueError("Index i out of bounds")
 
-    def Print(self):
+    def print(self):
         for attr in self.vector:
-            attr.Print()
+            attr.print()
 
-    def Copy(self):
+    def copy(self):
         attrList = list()
         for att in self.vector:
-            attrList.append(att.Copy())
+            attrList.append(att.copy())
 
         return Input(attrList)
+
+    #get the attribute in position i inside vector
+    def get(self, index:int):
+        if(index < 0 or index > len(self.vector)):
+            raise IndexError ("get: index out of bound")
+
+        return self.vector[index]
+
+    #restituisce un'unica lista contenente l'input codificato
+    def getInput(self):
+        l = list()
+        for attribute in self.vector:
+            l = l + attribute.copy().represention
+        return l
 
 #Sottoclasse degli input completi di target: ideali per TR, VS.
 class TRInput(Input):
@@ -134,35 +165,42 @@ class TRInput(Input):
     def getTarget(self):
         return self.target
 
-    def Print(self):
+    def print(self):
         for attr in self.vector:
-            attr.Print()
+            attr.print()
 
         print("target "+ str(self.target))
 
-    def Copy(self):
+    def copy(self):
         attrList = list()
         for att in self.vector:
             
-            attrList.append(att.Copy())
+            attrList.append(att.copy())
 
         return TRInput(attrList, self.target)
 
+    def len(self):
+        return len(self.vector)
 
-"""
+    
+            
+
+
+
 #{"blue", "green", "red"}
 a1 = Attribute(3, 2)
-print(str(a1.Decode(["blue", "green", "red"])))
+print(str(a1.decode(["blue", "green", "red"])))
+
 
 #{-1, 0, 1, 2}
 a2 = Attribute(4, 3)
-print(str(a2.Decode([-1, 0, 1, 2])))
+print(str(a2.decode([-1, 0, 1, 2])))
 
 attrList = [a1, a2]
 
 input1 = Input(attrList)
 
-input1.Print()
+input1.print()
 
 print(input1.getValue(0)==0)
 print(input1.getValue(1)==1)
@@ -173,14 +211,22 @@ print(input1.getValue(5)==1)
 print(input1.getValue(6)==1)
 
 input2 = TRInput(attrList,True)
-input2.Print()
+input2.print()
 
 
 input3 = input2
 print(input2 == input3)
 
-input3 = input2.Copy()
+input3 = input2.copy()
 print(input2 == input3)
+
+inp = input3.getInput()
+l = list()
+for elem in inp:
+    l.append(int(elem))
+print("input :"+ str(l))
+
+
 # Output atteso:
 # green
 # 1
@@ -197,4 +243,4 @@ print(input2 == input3)
 # 0010
 # target True
 
-"""
+

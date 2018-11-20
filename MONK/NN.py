@@ -11,7 +11,11 @@ from Input import Attribute, Input, TRInput
 # distinto nei due casi sopra citati) si demanda ad opportune sottoclassi.
 class Unit(object):
 
-    def __init__(self, pos : int, dim : int, ValMax : float):
+    #pos: posizione dell'unità all'interno del layer
+    #dim: numero di archi entranti nell'unità
+    #ValMax: valore massimo del peso di un arco
+    #f: funzione di attivazione
+    def __init__(self, pos : int, dim : int, ValMax : float, f):
         from random import uniform
         #Inizializzazione dei pesi a valori casuali (distr. uniforme).
         self.weights = [uniform(0,ValMax) for i in range(dim)]
@@ -20,16 +24,19 @@ class Unit(object):
         # al layer precedente.
         self.pos = pos
         self.dim = dim
+        self.f = f
     
     #Restituisce il Net (somma pesata dei valori in ingresso all'unità) calcolato a partire
     #dall'input dell'unità inp.
     def getNet(self, inp : list):
         if len(inp) == self.dim:
             s = 0
-            for el in inp:
+            for i in range(len(inp)):
+                el = inp[i]
                 if not isinstance(el,(int,float)):
                     raise RuntimeError ("getNet: passed non-number input element.")
-                i = inp.index(el)
+                #i = inp.index(el) errore perchè se 2 elem hanno lo stesso valore non funziona
+
                 s += self.weights[i]*el
             return s
         else:
@@ -37,26 +44,47 @@ class Unit(object):
 
     #Restituisce l'ouput calcolato sull'unità corrente (Net valutato nella funzione di
     # attivazione).
-    def getOutput(self, inp: list, f):
-        return(f(self.getNet(inp)))
+    def getOutput(self, inp: list):
+        net = self.getNet(inp)
+        fval = self.f(net)
+        return fval
 
 #Sottoclasse delle unità hidden.
 class HiddenUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax):
-        super().__init__(pos,dim,ValMax)
+    def __init__(self, pos, dim, ValMax, f):
+        super().__init__(pos,dim,ValMax,f)
 
-    def getDelta(self):
-        raise NotImplementedError
+    #costruisce il delta da usare nell'algoritmo di backpropagation
+    #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
+    #input: input passato all'unità
+    #deltaList: lista dei delta ottenuti al livello soprastante
+    #weightsList: lista dei pesi che si riferiscono all'unità 
+    def getDelta(self, derivative, input:list, deltaList:list, weightsList:list):
+        s = 0
+
+        #Sommatoria(DELTAk * Wkj)
+        for i in range(0, len(deltaList)):
+            s += deltaList[i]*weightsList[i]
+
+        net = self.getNet(input)
+        dx = derivative(net)
+        return s*dx
 
 #Sottoclasse delle unità di output.
 class OutputUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax):
-        super().__init__(pos,dim,ValMax)
+    def __init__(self, pos, dim, ValMax, f):
+        super().__init__(pos,dim,ValMax,f)
     
-    def getDelta(self):
-        raise NotImplementedError
+    #costruisce il delta da usare nell'algoritmo di backpropagation
+    #targetOut: valore di target che associato all'input
+    #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
+    #input: input passato all'unità
+    def getDelta(self, targetOut, derivative, input:list):
+        return (targetOut - self.getOutput(input))*derivative(self.getNet(input))
+        
+
 
 
 class NeuralNetwork(object):
@@ -97,12 +125,12 @@ class NeuralNetwork(object):
 
         #Creazione delle hidden units.
         for j in range(self.noHiddLayers):
-            hiddenList = [HiddenUnit(j+1,length,self.hyp['ValMax']) for i in range(self.hyp['HiddenUnits'])]
+            hiddenList = [HiddenUnit(j+1,length,self.hyp['ValMax'], self.hyp['ActivFun']) for i in range(self.hyp['HiddenUnits'])]
             self.layers.append(hiddenList)
             length = len(hiddenList)
 
         #Creazione delle output units.
-        outputList = [OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax']) for i in range(self.hyp['OutputUnits'])]
+        outputList = [OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax'], self.hyp['ActivFun']) for i in range(self.hyp['OutputUnits'])]
         self.layers.append(outputList)
 
     #Esegue backpropagation e istruisce la rete settando i pesi.
@@ -122,11 +150,14 @@ class NeuralNetwork(object):
     #Resituisce la lista degli output di rete (lista dei valori uscenti dalle unità di output) dato l'input inp.
     def getOutput(self, inp : Input):
         #Da inp costruisco la corrispondente lista di interi.
-        valList = [inp.getValue(i) for i in range(inp.getLength())]
+        valList = list()
+        l = inp.getInput()
+        for i in range(len(l)):
+            valList.append(int(l[i]))
 
         #Calcolo gli outputs delle unità sui layers successivi.
         for i in range(1,len(self.layers)):
-            valList = [unit.getOutput(valList,self.hyp['ActivFun']) for unit in self.getLayer(i)]
+            valList = [unit.getOutput(valList) for unit in self.getLayer(i)]
         return valList
         
         
@@ -155,6 +186,7 @@ class NeuralNetwork(object):
 
 
 #Test.
+from math import exp
 a1=Attribute(5,3)
 a2=Attribute(4,2)
 i1=TRInput([a1,a2],False)
@@ -167,8 +199,71 @@ i3=Input([a1,a2,a3])
 
 il=[i1,i2]
 n = NeuralNetwork(il)
-print(n.getOutput(i2))
+out = n.getOutput(i2)
+print(out)
 print(n.getError([i2],0,1))
+
+#prova con perceptron
+def perceptron(x): 
+    return int(x >= 0.5)
+
+f = derivative = perceptron
+
+
+l = i2.getInput()
+linp = list()
+for el in l:
+    linp.append(int(el))
+print("\n\n\n*****************\nPerceptron")
+print("input: "+str(linp)) 
+
+outUnit = OutputUnit(1, 1, 0.2, f)
+hiddenUnit = HiddenUnit(1, len(linp), 0.2, f)
+
+hout = list()
+hout.append(hiddenUnit.getOutput(linp))
+onet = outUnit.getNet(hout)
+outputOut = outUnit.getOutput(hout)
+outputDelta = outUnit.getDelta(1, derivative, hout)
+
+print("output delta:" +str(outputDelta))
+hnet = hiddenUnit.getNet(linp)
+hiddenDelta = hiddenUnit.getDelta(derivative, linp, [outputDelta], [1])
+print("hidden delta:" +str(hiddenDelta))
+print("**********************************")
+#
+
+#prova con sigmoid
+def sigmoid(x): 
+    return 1/(1+(exp(-x)))
+
+f =  sigmoid
+
+derivative = lambda x: exp(-x)/((1+exp(-x))**2)
+
+l = i2.getInput()
+linp = list()
+for el in l:
+    linp.append(int(el))
+print("\n\n\n\nsigmoid")
+print("input: "+str(linp)) 
+
+outUnit = OutputUnit(1, 1, 0.2, f)
+hiddenUnit = HiddenUnit(1, len(linp), 0.2, f)
+
+hout = list()
+hout.append(hiddenUnit.getOutput(linp))
+onet = outUnit.getNet(hout)
+outputOut = outUnit.getOutput(hout)
+outputDelta = outUnit.getDelta(1, derivative, hout)
+
+print("output delta:" +str(outputDelta))
+hnet = hiddenUnit.getNet(linp)
+hiddenDelta = hiddenUnit.getDelta(derivative, linp, [outputDelta], [1])
+print("hidden delta:" +str(hiddenDelta))
+#
+
+
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
 

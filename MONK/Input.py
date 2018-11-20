@@ -67,6 +67,13 @@ class Attribute(object):
                 string += str(0)
         print(string)
 
+    #restituisce la rappresentaziione come lista di interi
+    def toInt(self):
+        l = list()
+        for elem in self.represention:
+            l.append(int(elem))
+        return l
+
 class Input(object):
 
     def __init__(self, attributeList: list):
@@ -98,6 +105,13 @@ class Input(object):
 
     def len(self):
         return len(self.vector)
+
+    #retituisce una lista di interi che è la codifica 1-of-k di tutti gli attributi dell'input
+    def toInt(self):
+        l = list()
+        for attr in self.vector:
+            l.append(attr.toInt())
+        return l
 
     #interfacing: restituisce il valore 0-1 memorizzato in posizione i dell'Input corrente
     #ACHTUNG: i in (0,length-1)!!
@@ -211,6 +225,8 @@ l = list()
 for elem in inp:
     l.append(int(elem))
 print("input :"+ str(l))
+
+
 # Output atteso:
 # green
 # 1

@@ -16,7 +16,7 @@ class DataSet(object):
     # considerarsi come target value. Se nella lista è presente un numero < 0
     #significa che quell'attributo non va considerato
     #rowSkip: lista di interi indica eventuali righe da saltare (parte da 1)
-    def __init__(self, filePath, tr: bool , domains: list, rowSkip: list = None):
+    def __init__(self, filePath, splitchar, tr: bool , domains: list, rowSkip: list = None):
         
         
         try:
@@ -30,7 +30,7 @@ class DataSet(object):
             self.inputList = list()
             while line != "":
                 if rowSkip == None or not i in rowSkip:
-                    parsedLine = line.strip().split(" ")
+                    parsedLine = line.strip().split(splitchar)
                     for j in range(0, len(parsedLine)):
                         cardinality = domains[j]
                         
@@ -85,7 +85,7 @@ class DataSet(object):
 
 
 domains = [0, 3, 3, 2, 3, 4, 2, -1]
-dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", True, domains)
+dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " ", True, domains)
 
 for elem in dati.getInputs():
     elem.print()
@@ -95,7 +95,7 @@ skipRow = list()
 for i in range(2,432):
     skipRow.append(i)
 
-dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", True, domains, skipRow)
+dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " ", True, domains, skipRow)
 
 print("prova skip")
 for elem in dati.getInputs():

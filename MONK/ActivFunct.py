@@ -3,8 +3,8 @@ Classe che implementa la funzione di attivazione, con relativo calcolo della der
 """
 class ActivFunct(object):
 
-    #Costruttuore: inserisco come attributo la funzione di attivazione fissati gli iperparametri.
-    #ACHTUNG: gli iperparametri vanno posti in testa alla lista!
+    #Costruttuore: inserisco come attributo la funzione di attivazione fissati i parametri.
+    #ACHTUNG: i parametri vanno posti in testa alla lista!
     def __init__(self, f, param : list):
         from functools import partial
         self.f = f
@@ -15,18 +15,19 @@ class ActivFunct(object):
     def getf(self, x):
         return self.f(x)
     
-    #Restituisce il valore della derivata prima della funzione di attivazione calcolata in x.
+    #Restituisce il valore della derivata prima (differenze finite, scipy.misc.derivative)
+    #della funzione di attivazione calcolata in x.
     def getDerivative(self,x):
         from scipy.misc import derivative
         return derivative(self.f,x,dx=10e-10)
+    
+    
 
-
+"""
 def sigmoidal(a,x):
     from math import exp
     return 1/(1+exp(-a*x))
 
-
-"""
 f = ActivFunct(sigmoidal,[1])
 print(f.getf(0.000012334))
 print(f.getDerivative(0.000012334))

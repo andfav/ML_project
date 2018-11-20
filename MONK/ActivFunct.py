@@ -26,10 +26,8 @@ class ActivFunct(object):
     def getDerivative(self,x):
         from scipy.misc import derivative
         return derivative(self.f,x,dx=10e-10)
-    
-    
 
-
+"""
 def sigmoidal(a,x):
     from math import exp
     return 1/(1+exp(-a*x))
@@ -40,3 +38,4 @@ print(f.getDerivative(0.000012334))
 
 # Atteso lancio di eccezione.
 f = ActivFunct(sigmoidal,[1, 2, 3, 4])
+"""

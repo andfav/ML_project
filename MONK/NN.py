@@ -4,7 +4,7 @@ in particolare è utilizzato un algoritmo di apprendimento backpropagation di ti
 batch.
 Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
-from Input import Attribute, Input, TRInput
+from Input import Attribute, OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
 from ActivFunct import ActivFunct
 
 #Superclasse relativa ad una generica unità di rete: non si distingue se l'unità corrente
@@ -115,12 +115,12 @@ class NeuralNetwork(object):
         self.f = f
 
         #Inserimento del training set.
-        if len(trainingSet) == 0 or not isinstance(trainingSet[0], TRInput):
+        if len(trainingSet) == 0 or not isinstance(trainingSet[0], TRInput and OneOfKTRInput):
             raise ValueError ("inserted TR set is not valid!")
         else:
             length = trainingSet[0].getLength()
             for el in trainingSet:
-                if not isinstance(el, TRInput) or el.getLength() != length:
+                if not isinstance(el, TRInput and OneOfKTRInput) or el.getLength() != length:
                     raise ValueError ("TR set not valid: not homogeneous")
             self.layers.append(trainingSet.copy())
 
@@ -150,11 +150,9 @@ class NeuralNetwork(object):
     
     #Resituisce la lista degli output di rete (lista dei valori uscenti dalle unità di output) dato l'input inp.
     def getOutput(self, inp : Input):
-        #Da inp costruisco la corrispondente lista di interi.
+        #Da inp costruisco la corrispondente lista.
         valList = list()
-        l = inp.getInput()
-        for i in range(len(l)):
-            valList.append(int(l[i]))
+        valList = inp.getInput()
 
         #Calcolo gli outputs delle unità sui layers successivi.
         for i in range(1,len(self.layers)):
@@ -162,17 +160,18 @@ class NeuralNetwork(object):
         return valList
         
         
-    #Calcola l'errore (rischio) empirico della lista di TRInput data, sulla i-esima
-    #unità di output (Att: i va da 0 ad OutputUnits-1!) con la regola dei LS riscalata
-    #per il fattore k. Ad es. k=1/len(data) da' LMS.
-    def getError(self, data : list, i : int, k : int):
+    #Calcola l'errore (rischio) empirico della lista di TRInput o OneOfKTRInput data, sulla i-esima
+    #unità di output (Att: i va da 0 ad OutputUnits-1!) con la funzione L (loss)
+    # eventualmente assegnata, default=LMS e fattore di riscalamento k.
+    def getError(self, data : list, i : int, k, L=lambda target,value: (target - value)**2):
+        
         #Controllo di validità dei dati.
-        if len(data) == 0 or not isinstance(data[0], TRInput):
+        if len(data) == 0 or not isinstance(data[0], TRInput and OneOfKTRInput):
             raise ValueError ("inserted set is not valid!")
         else:
             length = data[0].getLength()
             for el in data:
-                if not isinstance(el, TRInput) or el.getLength() != length:
+                if not isinstance(el, TRInput and OneOfKTRInput) or el.getLength() != length:
                     raise ValueError ("data set not valid: not homogeneous")
 
         #Controllo di validità dell'indice i.
@@ -182,21 +181,21 @@ class NeuralNetwork(object):
         #Calcolo effettivo dell'errore.
         s = 0
         for d in data:
-            s += (d.getTarget() - self.getOutput(d)[i])**2
+            s += L(d.getTarget(),self.getOutput(d)[i])
         return k*s
 
 
 #Test.
 from math import exp
-a1=Attribute(5,3)
-a2=Attribute(4,2)
-i1=TRInput([a1,a2],False)
+a1=OneOfKAttribute(5,3)
+a2=OneOfKAttribute(4,2)
+i1=OneOfKTRInput([a1,a2],False)
 
-a1=Attribute(5,1)
-a2=Attribute(4,3)
-a3=Attribute(2,1)
-i2=TRInput([a1,a2],True)
-i3=Input([a1,a2,a3])
+a1=OneOfKAttribute(5,1)
+a2=OneOfKAttribute(4,3)
+a3=OneOfKAttribute(2,1)
+i2=OneOfKTRInput([a1,a2],True)
+i3=OneOfKInput([a1,a2,a3])
 
 #prova con sigmoid
 def sigmoid(a,x): 

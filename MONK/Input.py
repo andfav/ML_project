@@ -104,7 +104,7 @@ class Input(object):
     #interfacing: restituisce il valore dell'attributo i-esimo
     def getValue(self, i: int):
         if i >= 0 and i < self.len():
-            return self.vector[i].value()
+            return self.vector[i].getValue()
         else:
             raise ValueError("Index i out of bounds")
 
@@ -112,9 +112,9 @@ class Input(object):
         string = ""
         i = 0
         while i < len(self.vector -1):
-            string+= str(self.vector[i].value())+ " "
+            string+= str(self.vector[i].getValue())+ " "
             i += 1
-        string+= str(self.vector[i].value)
+        string+= str(self.vector[i].getValue())
         print(string)
 
     def copy(self):
@@ -298,6 +298,7 @@ for elem in inp:
     l.append(int(elem))
 print("input :"+ str(l))
 
+input3.getValue(1)
 
 # Output atteso:
 # green

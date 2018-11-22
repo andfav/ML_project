@@ -122,6 +122,15 @@ class Input(object):
         for attr in self.vector:
             l.append(attr.copy())
         return Input(l)
+
+    #restituisce un'unica lista contenente l'input codificato
+    #EDIT: spostato il metodo da OneOfKInput al più generale Input.
+    def getInput(self):
+        l = list()
+        for attribute in self.vector:
+            l = l + attribute.copy().represention
+        return l
+
 """
 Input i cui attributi sono codificati in modo 1-of-k
 """
@@ -193,12 +202,6 @@ class OneOfKInput(Input):
 
         return self.vector[index]
 
-    #restituisce un'unica lista contenente l'input codificato
-    def getInput(self):
-        l = list()
-        for attribute in self.vector:
-            l = l + attribute.copy().represention
-        return l
 
 """
 Sottoclasse degli input completi di target: ideali per TR, VS.

@@ -13,13 +13,13 @@ from ActivFunct import ActivFunct
 class Unit(object):
 
     #pos: posizione dell'unità all'interno del layer
-    #dim: numero di archi entranti nell'unità
+    #dim: numero di archi entranti nell'unità (bias escluso)
     #ValMax: valore massimo del peso di un arco
     #f: funzione di attivazione
     def __init__(self, pos : int, dim : int, ValMax : float, f : ActivFunct):
         from random import uniform
         #Inizializzazione dei pesi a valori casuali (distr. uniforme).
-        self.weights = [uniform(0,ValMax) for i in range(dim)]
+        self.weights = [uniform(0,ValMax) for i in range(dim+1)]
 
         #Memorizzazione della posizione nel layer corrente, del numero di connessioni 
         # al layer precedente.
@@ -31,14 +31,15 @@ class Unit(object):
     #dall'input dell'unità inp.
     def getNet(self, inp : list):
         if len(inp) == self.dim:
-            s = 0
+            #Primo passo: bias=1 * self.weights[0]
+            s = self.weights[0]
+
             for i in range(len(inp)):
                 el = inp[i]
                 if not isinstance(el,(int,float)):
                     raise RuntimeError ("getNet: passed non-number input element.")
-                #i = inp.index(el) errore perchè se 2 elem hanno lo stesso valore non funziona
 
-                s += self.weights[i]*el
+                s += self.weights[i+1]*el
             return s
         else:
             raise RuntimeError ("getNet: numbers of weights and inputs don't match.")
@@ -91,13 +92,12 @@ class OutputUnit(Unit):
 class NeuralNetwork(object):
     
     def __init__(self, trainingSet: list, f : ActivFunct, new_hyp={}):
-        from math import exp
         #Dizionario contenente i settaggi di default (ovviamente modificabili) 
         #degli iperparametri. 
-        self.hyp = {'eta':         0.1,
-                    'alpha':       0.1,
-                    'lambda':      0.1,
-                    'ValMax':      0.2,
+        self.hyp = {'learnRate':    0.1,
+                    'momRate':      0.1,
+                    'regRate':      0.1,
+                    'ValMax':       0.2,
                     'HiddenLayers': 1,
                     'HiddenUnits':  2,
                     'OutputUnits':  1}

@@ -266,11 +266,21 @@ class NeuralNetwork(object):
                 i = self.layers[layer].index(unit)
                 j = unit.weights.index(weight)
 
-                if layer == 2:
-                    ratio_W_i_j_partial = self.hyp["learnRate"] * delta[i]* self.layers[layer-1][j].getOutput(inp.getInput()) 
-    
+                #Memorizzo l'ouput dell'unità j del layer precedente sulla variabile outj,
+                #generalizzando i casi input, bias ed hidden.
+                if j == 0:
+                    #Bias
+                    outj = 1  
+                elif layer == 2:
+                    #Hidden: attenzione che il weight j=0 corrisponde al bias, devo
+                    #dunque accedere all'unità in posizione j-1 corrispondentemente ad
+                    #ogni peso j non zero.
+                    outj = self.layers[layer-1][j-1].getOutput(inp.getInput()) 
                 else:
-                    ratio_W_i_j_partial = self.hyp["learnRate"] * delta[i]* inp.getInput()[j]
+                    #Input
+                    outj = inp.getInput()[j-1]
+
+                ratio_W_i_j_partial = self.hyp["learnRate"] * delta[i] * outj
 
                 ratio_W[i,j] += ratio_W_i_j_partial + self.hyp["momRate"] * oldWeightsRatio[i,j]
 

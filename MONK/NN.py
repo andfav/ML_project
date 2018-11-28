@@ -6,6 +6,8 @@ Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
 from Input import Attribute, OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
 from ActivFunct import ActivFunct
+from multiprocessing.dummy import Pool as ThreadPool
+
 
 #Superclasse relativa ad una generica unità di rete: non si distingue se l'unità corrente
 #sia hidden oppure di output. Il calcolo del delta relativo alla backpropagation (che risulta
@@ -13,13 +15,13 @@ from ActivFunct import ActivFunct
 class Unit(object):
 
     #pos: posizione dell'unità all'interno del layer
-    #dim: numero di archi entranti nell'unità
+    #dim: numero di archi entranti nell'unità (bias escluso)
     #ValMax: valore massimo del peso di un arco
     #f: funzione di attivazione
     def __init__(self, pos : int, dim : int, ValMax : float, f : ActivFunct):
         from random import uniform
         #Inizializzazione dei pesi a valori casuali (distr. uniforme).
-        self.weights = [uniform(0,ValMax) for i in range(dim)]
+        self.weights = [uniform(0,ValMax) for i in range(dim + 1)]
 
         #Memorizzazione della posizione nel layer corrente, del numero di connessioni 
         # al layer precedente.
@@ -31,17 +33,21 @@ class Unit(object):
     #dall'input dell'unità inp.
     def getNet(self, inp : list):
         if len(inp) == self.dim:
-            s = 0
+            #Primo passo: bias=1 * self.weights[0]
+            s = self.weights[0]
+
             for i in range(len(inp)):
                 el = inp[i]
                 if not isinstance(el,(int,float)):
                     raise RuntimeError ("getNet: passed non-number input element.")
-                #i = inp.index(el) errore perchè se 2 elem hanno lo stesso valore non funziona
-
-                s += self.weights[i]*el
+                
+                s += self.weights[i+1]*el
             return s
         else:
             raise RuntimeError ("getNet: numbers of weights and inputs don't match.")
+
+    def getWeight(self, index):
+        return self.weights[index]
 
     #Restituisce l'ouput calcolato sull'unità corrente (Net valutato nella funzione di
     # attivazione).
@@ -87,17 +93,19 @@ class OutputUnit(Unit):
         
 
 
-
+#layers[0]: inputs
+#layers[1]: hidden units
+#layers[2]: output units
 class NeuralNetwork(object):
     
     def __init__(self, trainingSet: list, f : ActivFunct, new_hyp={}):
         from math import exp
         #Dizionario contenente i settaggi di default (ovviamente modificabili) 
         #degli iperparametri. 
-        self.hyp = {'eta':         0.1,
-                    'alpha':       0.1,
-                    'lambda':      0.1,
-                    'ValMax':      0.2,
+        self.hyp = {'learnRate': 0.1,
+                    'momRate':   0.1,
+                    'regRate':   0.1,
+                    'ValMax':    0.2,
                     'HiddenLayers': 1,
                     'HiddenUnits':  2,
                     'OutputUnits':  1}
@@ -184,6 +192,68 @@ class NeuralNetwork(object):
             s += L(d.getTarget(),self.getOutput(d)[i])
         return k*s
 
+    #region Thread Deltas utils
+    def getHiddenOut(self, unit: HiddenUnit, input):
+        return unit.getOutput(input)
+        
+    def getDeltaOut(self, unit: OutputUnit, input, target):
+        return unit.getDelta(target, input)
+
+    def getDeltaHidden(self, unit: HiddenUnit, input, deltaList, outUnits: list):
+        weights = list()
+        hiddenUnitIndex = self.layers[1].index(unit)
+        for outUnit in outUnits:
+            if isinstance(outUnit, OutputUnit):
+                weights.append(outUnit.getWeight(hiddenUnitIndex))
+            else:
+                raise ValueError("in getDeltaHidden, outUnits type error")   
+
+        return unit.getDelta(input, deltaList, weights)
+
+    #endregion
+
+    """
+    Questo metodo permette di calcolare i delta della backpropagation in parallelo
+
+    -param
+        inp: input per il quale calcolare i delta
+    -result
+        Tupla<Lista dei delta relativi alle unità di output,  Lista dei delta relativi alle unità hidden>
+    """
+    def getDeltas(self, inp: Input, nThread: int = 0):
+        import functools
+
+        if not isinstance(inp, TRInput and OneOfKTRInput):
+            raise ValueError ("inserted input is not valid!")
+        
+        if nThread < = 0:
+        #calcolo ouput delle unità hidden, che costituiscono l'input per le unità output
+            pool = ThreadPool()
+        else:
+            pool = ThreadPool(nThread)
+        hiddenOutResults = pool.map(functools.partial(self.getHiddenOut, input=inp.getInput()), self.layers[1])
+        pool.close()
+        pool.join()
+        
+        #calcolo dei delta delle unità di output
+        pool = ThreadPool()
+        targetOut = inp.getTarget()
+        deltaOutResults = pool.map(functools.partial(self.getDeltaOut, target=targetOut,input=hiddenOutResults), self.layers[2])
+        pool.close()
+        pool.join()
+
+        #calcolo dei delta delle unità hidden
+        pool = ThreadPool()
+        deltaHiddenResults = pool.map(functools.partial(self.getDeltaHidden, input=inp.getInput(), deltaList=deltaOutResults, outUnits=self.layers[2]), self.layers[1])
+        pool.close()
+        pool.join()
+
+
+        result = (deltaOutResults, deltaHiddenResults)
+        return result
+
+
+        
 
 #Test.
 from math import exp
@@ -229,9 +299,10 @@ print("output delta:" +str(outputDelta))
 hnet = hiddenUnit.getNet(linp)
 hiddenDelta = hiddenUnit.getDelta(linp, [outputDelta], [1])
 print("hidden delta:" +str(hiddenDelta))
-#
 
+result = n.getDeltas(i1)
 
+print (result)
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
 

@@ -122,6 +122,12 @@ class Input(object):
         for attr in self.vector:
             l.append(attr.copy())
         return Input(l)
+
+    def getInput(self):
+        l = list()
+        for elem in self.vector:
+            l.append(elem.getValue())
+        return l
 """
 Input i cui attributi sono codificati in modo 1-of-k
 """
@@ -257,7 +263,7 @@ class OneOfKTRInput(OneOfKInput):
 
 
 
-
+"""
 
 #{"blue", "green", "red"}
 a1 = OneOfKAttribute(3, 2)
@@ -299,7 +305,7 @@ for elem in inp:
 print("input :"+ str(l))
 
 input3.getValue(1)
-
+"""
 # Output atteso:
 # green
 # 1

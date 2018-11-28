@@ -100,7 +100,6 @@ class OutputUnit(Unit):
 class NeuralNetwork(object):
     
     def __init__(self, trainingSet: list, f : ActivFunct, new_hyp={}):
-        from math import exp
         #Dizionario contenente i settaggi di default (ovviamente modificabili) 
         #degli iperparametri. 
         self.hyp = {'learnRate': 0.1,
@@ -285,7 +284,10 @@ class NeuralNetwork(object):
     def batchIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array):
 
         ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1] + 1)))
-        ratio_W_Hidden = scipy.zeros((len(self.layers[1]), len(self.layers[0] + 1)))
+        #Errore: in self.layers[0] ho salvato una lista di input, a me serve invece il numero
+        #di attributi del singolo input, prendo l'input in posizione 0 come riferimento visto 
+        #che ho già fatto il controllo di omogeneità in fase di inizializzazione.
+        ratio_W_Hidden = scipy.zeros((len(self.layers[1]), len(self.layers[0][0].len() + 1)))
 
         #scorro sugli input
         for inp in self.layers[0]:
@@ -308,6 +310,7 @@ class NeuralNetwork(object):
             for j in range (len(self.layers[0]+1)):
                 w_i_j = self.layers[1][i].weights[j]
                 self.layers[1][i].weights[j] += ratio_W_Hidden[i,j] - self.hyp["regRate"] * w_i_j
+        
 #Test.
 from math import exp
 a1=OneOfKAttribute(5,3)

@@ -7,6 +7,7 @@ Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 from Input import Attribute, OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
 from ActivFunct import ActivFunct
 from multiprocessing.dummy import Pool as ThreadPool
+import scipy
 
 
 #Superclasse relativa ad una generica unità di rete: non si distingue se l'unità corrente
@@ -226,7 +227,7 @@ class NeuralNetwork(object):
         if not isinstance(inp, TRInput and OneOfKTRInput):
             raise ValueError ("inserted input is not valid!")
         
-        if nThread < = 0:
+        if nThread <= 0:
         #calcolo ouput delle unità hidden, che costituiscono l'input per le unità output
             pool = ThreadPool()
         else:
@@ -253,8 +254,60 @@ class NeuralNetwork(object):
         return result
 
 
-        
+    def updateRatio(self, layer: int, oldWeightsRatio: scipy.array, ratio_W: scipy.array, delta: list, inp: Input):
+        if layer > 2 or layer < 1:
+            raise ValueError("in updateRatio 1 <= layer <= 2")
 
+    
+        #itero sulle unità del livello corrente
+        for unit in self.layers[layer]:
+
+            #itero sui pesi della unità selezionata
+            for weight in unit.weights:
+                i = self.layers[layer].index(unit)
+                j = unit.weights.index(weight)
+
+                if layer == 2:
+                    ratio_W_i_j_partial = self.hyp["learnRate"] * delta[i]* self.layers[layer-1][j].getOutput(inp.getInput()) 
+    
+                else:
+                    ratio_W_i_j_partial = self.hyp["learnRate"] * delta[i]* inp.getInput()[j]
+
+                ratio_W[i,j] += ratio_W_i_j_partial + self.hyp["momRate"] * oldWeightsRatio[i,j]
+
+        return ratio_W
+    """
+    Metodo che implementa una iterazione dell'algoritmo batch backprop
+
+    -arguments
+        oldWeightsRatio: lista delle variazioni dei pesi all'iterazione precedente
+    """
+    def batchIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array):
+
+        ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1] + 1)))
+        ratio_W_Hidden = scipy.zeros((len(self.layers[1]), len(self.layers[0] + 1)))
+
+        #scorro sugli input
+        for inp in self.layers[0]:
+            (outDelta, hiddenDelta) = self.getDeltas(inp.getInput())
+
+            ratio_W_Out = self.updateRatio(2, oldWeightsRatioOut, ratio_W_Out, outDelta, inp)
+            ratio_W_Hidden = self.updateRatio(1, oldWeightsRatioHidden, ratio_W_Hidden, hiddenDelta, inp)
+
+        ratio_W_Out /= len(self.layers[0])
+        ratio_W_Hidden /= len(self.layers[0])
+        oldWeightsRatioOut = ratio_W_Out
+        oldWeightsRatioHidden = ratio_W_Hidden
+
+        for i in range (len(self.layers[2])):
+            for j in range (len(self.layers[1]+1)):
+                w_i_j = self.layers[2][i].weights[j]
+                self.layers[2][i].weights[j] += ratio_W_Out[i,j] - self.hyp["regRate"] * w_i_j
+
+        for i in range (len(self.layers[1])):
+            for j in range (len(self.layers[0]+1)):
+                w_i_j = self.layers[1][i].weights[j]
+                self.layers[1][i].weights[j] += ratio_W_Hidden[i,j] - self.hyp["regRate"] * w_i_j
 #Test.
 from math import exp
 a1=OneOfKAttribute(5,3)

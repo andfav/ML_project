@@ -161,7 +161,7 @@ class OneOfKInput(Input):
         return s
 
     def len(self):
-        return len(self.vector)
+        return self.getLength()
 
 
     #interfacing: restituisce il valore 0-1 memorizzato in posizione i dell'Input corrente
@@ -259,7 +259,7 @@ class OneOfKTRInput(OneOfKInput):
         return OneOfKTRInput(attrList, self.target)
 
     def len(self):
-        return len(self.vector)
+        return super().getLength()
 
 
 

@@ -279,7 +279,7 @@ class NeuralNetwork(object):
     -result
         Tupla<Lista dei delta relativi alle unità di output,  Lista dei delta relativi alle unità hidden>
     """
-    def getDeltas(self, inp: Input, nThread: int = 0):
+    def getDeltas(self, inp: Input, nThread: int = -1):
         import functools
 
         if not isinstance(inp, TRInput and OneOfKTRInput):
@@ -308,23 +308,49 @@ class NeuralNetwork(object):
         pool.join()
 
 """
-        hiddenOutResults = list()
-        for unit in self.layers[1]:
-            hiddenOutResults.append(unit.getOutput(inp.getInput()))
+        if nThread == 0:
+            hiddenOutResults = list()
+            for unit in self.layers[1]:
+                hiddenOutResults.append(unit.getOutput(inp.getInput()))
 
-        deltaOutResults = list()
-        for unit in self.layers[2]:
-            deltaOutResults.append(unit.getDelta(inp.getTarget(), hiddenOutResults))
+            deltaOutResults = list()
+            for unit in self.layers[2]:
+                deltaOutResults.append(unit.getDelta(inp.getTarget(), hiddenOutResults))
 
-        deltaHiddenResults = list()
+            deltaHiddenResults = list()
 
-        for unit in self.layers[1]:
-            wList = list()
-            for out in self.layers[2]:
-                wList.append(out.weights[unit.pos + 1])
-            deltaHiddenResults.append(unit.getDelta(inp.getInput(), deltaOutResults, wList))
-        result = (deltaOutResults, deltaHiddenResults)
-        return result
+            for unit in self.layers[1]:
+                wList = list()
+                for out in self.layers[2]:
+                    wList.append(out.weights[unit.pos + 1])
+                deltaHiddenResults.append(unit.getDelta(inp.getInput(), deltaOutResults, wList))
+            result = (deltaOutResults, deltaHiddenResults)
+            return result
+        else:
+            if nThread < 0:
+            #calcolo ouput delle unità hidden, che costituiscono l'input per le unità output
+                pool = ThreadPool()
+            else:
+                pool = ThreadPool(nThread)
+
+            hiddenOutResults = pool.map(functools.partial(self.getHiddenOut, input=inp.getInput()), self.layers[1])
+            pool.close()
+            pool.join()
+            
+            #calcolo dei delta delle unità di output
+            pool = ThreadPool()
+            targetOut = inp.getTarget()
+            deltaOutResults = pool.map(functools.partial(self.getDeltaOut, target=targetOut,input=hiddenOutResults), self.layers[2])
+            pool.close()
+            pool.join()
+
+            #calcolo dei delta delle unità hidden
+            pool = ThreadPool()
+            deltaHiddenResults = pool.map(functools.partial(self.getDeltaHidden, input=inp.getInput(), deltaList=deltaOutResults, outUnits=self.layers[2]), self.layers[1])
+            pool.close()
+            pool.join()
+            result = (deltaOutResults, deltaHiddenResults)
+            return result
 
 
     def updateRatio(self, layer: int, oldWeightsRatio: scipy.array, ratio_W: scipy.array, delta: list, inp: Input, learnRate, momRate):
@@ -375,7 +401,7 @@ class NeuralNetwork(object):
 
         #scorro sugli input
         for inp in self.layers[0]:
-            (outDelta, hiddenDelta) = self.getDeltas(inp, 1)
+            (outDelta, hiddenDelta) = self.getDeltas(inp, 3)
 
             ratio_W_Out = self.updateRatio(2, oldWeightsRatioOut, ratio_W_Out, outDelta, inp, learnRate, momRate)
             ratio_W_Hidden = self.updateRatio(1, oldWeightsRatioHidden, ratio_W_Hidden, hiddenDelta, inp, learnRate, momRate)
@@ -470,7 +496,7 @@ columnSkip = [8]
 targetPos = 1
 trainingSet = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f)
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':100})
 neruale.learn(ModeLearn.BATCH)
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)

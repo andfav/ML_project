@@ -110,7 +110,7 @@ class DataSet(object):
 
         return inputs
 
-
+"""
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
@@ -130,3 +130,4 @@ dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " "
 print("prova skip")
 for elem in dati.getInputs():
     elem.print()
+"""

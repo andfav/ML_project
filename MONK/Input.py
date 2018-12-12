@@ -241,7 +241,9 @@ class OneOfKTRInput(OneOfKInput):
         self.target = target
 
     #interfacing: restituisce il target associato all'input corrente.
-    #EDIT: aggiunto smoothness del target tra 0.1 e 0.9.
+    def getTargetExact(self):
+        return self.target
+    
     def getTarget(self):
         return min(max(self.target,0.1),0.9)
 

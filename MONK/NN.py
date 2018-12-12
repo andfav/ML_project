@@ -8,7 +8,8 @@ from Input import Attribute, OneOfKAttribute, Input, OneOfKInput, TRInput, OneOf
 from ActivFunct import ModeActiv, ActivFunct
 from DataSet import DataSet, ModeInput
 from multiprocessing.dummy import Pool as ThreadPool
-import scipy, math, matplotlib, time
+import scipy, math, time
+import matplotlib.pyplot as graphic
 from scipy import linalg
 
 from enum import Enum
@@ -31,10 +32,8 @@ class Unit(object):
         if weights == None:
             from random import uniform
 
-            #Inizializzazione dei pesi a valori casuali (distr. uniforme) con fan-in (EDIT).
             rang = 2*ValMax/fanIn
             self.weights = [uniform(-rang,rang) for i in range(dim + 1)]
-
 
         else:
             if len(weights) == dim+1:
@@ -104,13 +103,6 @@ class OutputUnit(Unit):
     def __init__(self, pos, dim, ValMax, f : ActivFunct, weights: list = None, fanIn = 2):
         super().__init__(pos,dim,ValMax,f, weights, fanIn)
     
-    def getOutput(self, inp: list):
-        net = self.getNet(inp)
-        fval = self.f.getf(net)
-        if self.f.mode == ModeActiv.SIGMOIDAL:
-            return min(max(fval,0.1),0.9)
-        else:
-            return fval
     
     #costruisce il delta da usare nell'algoritmo di backpropagation
     #targetOut: valore di target che associato all'input
@@ -140,7 +132,7 @@ class NeuralNetwork(object):
                     'HiddenUnits':  2,
                     'OutputUnits':  1,
                     'MaxIter': 10e4,
-                    'Tolerance': 10e-8}
+                    'Tolerance': 10e-4}
 
         #Aggiornamento degli iperparametri.
         for key in new_hyp:
@@ -198,8 +190,10 @@ class NeuralNetwork(object):
             oldWeightsRatioOut = scipy.zeros((len(self.layers[2]), len(self.layers[1])+ 1))
             oldWeightsRatioHidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
             it = 0
+            vecErr = []
             lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
             err = linalg.norm(lErr,2)
+            vecErr.append(err)
             while(it < self.hyp["MaxIter"]  and err > self.hyp["Tolerance"]):
                 if mode == ModeLearn.BATCH:
                     t1 = time.time_ns()
@@ -213,7 +207,12 @@ class NeuralNetwork(object):
 
                 lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
+                vecErr.append(err)
+                print(it)
                 it += 1
+            graphic.plot(scipy.array(vecErr),'--')
+            graphic.show()
+            print(err)
         else:
             raise NotImplementedError ("Deep learning models not already implemented.")
     
@@ -270,10 +269,9 @@ class NeuralNetwork(object):
 
     def getDeltaHidden(self, unit: HiddenUnit, input, deltaList, outUnits: list):
         weights = list()
-        hiddenUnitIndex = self.layers[1].index(unit)
+        hiddenUnitIndex = unit.pos
         for outUnit in outUnits:
             if isinstance(outUnit, OutputUnit):
-                #EDIT: hiddenUnitIndex+1
                 weights.append(outUnit.getWeight(hiddenUnitIndex+1))
             else:
                 raise ValueError("in getDeltaHidden, outUnits type error")   
@@ -309,7 +307,6 @@ class NeuralNetwork(object):
             for unit in self.layers[1]:
                 wList = list()
                 for out in self.layers[2]:
-                    #EDIT: corretto significato di pos
                     wList.append(out.getWeight(unit.pos + 1))
                 deltaHiddenResults.append(unit.getDelta(inp.getInput(), deltaOutResults, wList))
             result = (deltaOutResults, deltaHiddenResults)
@@ -341,17 +338,16 @@ class NeuralNetwork(object):
             return result
 
 
-    def updateRatio(self, layer: int, oldWeightsRatio: scipy.array, ratio_W: scipy.array, delta: list, inp: Input, learnRate, momRate):
+    def updateRatio(self, layer: int, ratio_W: scipy.array, delta: list, inp: Input, learnRate):
         if layer > 2 or layer < 1:
             raise ValueError("in updateRatio 1 <= layer <= 2")
 
-    
         #itero sulle unità del livello corrente
         for unit in self.layers[layer]:
 
             #itero sui pesi della unità selezionata
             for weight in unit.weights:
-                i = self.layers[layer].index(unit)
+                i = unit.pos
                 j = unit.weights.index(weight)
 
                 #Memorizzo l'ouput dell'unità j del layer precedente sulla variabile outj,
@@ -368,10 +364,8 @@ class NeuralNetwork(object):
                     #Input
                     outj = inp.getInput()[j-1]
 
-                #EDIT: tolta aggiunta della componente momentum.
                 ratio_W[i,j] += learnRate * delta[i] * outj
 
-        return ratio_W
     """
     Metodo che implementa una iterazione dell'algoritmo batch backprop
 
@@ -390,13 +384,12 @@ class NeuralNetwork(object):
         for inp in self.layers[0]:
             (outDelta, hiddenDelta) = self.getDeltas(inp, 0)
 
-            ratio_W_Out = self.updateRatio(2, oldWeightsRatioOut, ratio_W_Out, outDelta, inp, learnRate, momRate)
-            ratio_W_Hidden = self.updateRatio(1, oldWeightsRatioHidden, ratio_W_Hidden, hiddenDelta, inp, learnRate, momRate)
+            self.updateRatio(2, ratio_W_Out, outDelta, inp, learnRate)
+            self.updateRatio(1, ratio_W_Hidden, hiddenDelta, inp, learnRate)
 
         ratio_W_Out /= len(self.layers[0])
         ratio_W_Hidden /= len(self.layers[0])
 
-        #EDIT: posta l'aggiunta della componente momentum solo dopo aver scorso tutti gli input.
         ratio_W_Out += momRate * oldWeightsRatioOut
         ratio_W_Hidden += momRate * oldWeightsRatioHidden
 
@@ -427,7 +420,7 @@ a3=OneOfKAttribute(2,1)
 i2=OneOfKTRInput([a1,a2],True)
 i3=OneOfKInput([a1,a2,a3])
 
-f = ActivFunct(param=[3])
+f = ActivFunct(param=[10])
 
 il=[i1,i2]
 n = NeuralNetwork(il,f)
@@ -483,9 +476,16 @@ domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
 trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':5, 'MaxIter':100, 'learnRate':0.01, 'MaxIter':100, 'ValMax':0.7, 'momRate':0.6})
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0})
 neruale.learn(ModeLearn.BATCH)
+
+s = 0
+for d in testSet.inputList:
+    out = (neruale.getOutput(d)[0] >= 0.5)
+    s += abs(out - d.getTargetExact())
+perc = 1 - s/len(testSet.inputList)
+print("Accuratezza sul test set: " + str(perc))
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)

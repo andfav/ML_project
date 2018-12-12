@@ -5,10 +5,12 @@ batch.
 Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
 from Input import Attribute, OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
-from ActivFunct import ActivFunct
+from ActivFunct import ModeActiv, ActivFunct
 from DataSet import DataSet, ModeInput
 from multiprocessing.dummy import Pool as ThreadPool
-import scipy, math, matplotlib, time
+import scipy, math, time
+import matplotlib.pyplot as graphic
+from scipy import linalg
 
 from enum import Enum
 class ModeLearn(Enum):
@@ -25,13 +27,14 @@ class Unit(object):
     #dim: numero di archi entranti nell'unità (bias escluso)
     #ValMax: valore massimo del peso di un arco
     #f: funzione di attivazione
-    def __init__(self, pos : int, dim : int, ValMax : float, f : ActivFunct, weights: list = None):
+    def __init__(self, pos : int, dim : int, ValMax : float, f : ActivFunct, weights: list = None, fanIn = 2):
 
         if weights == None:
             from random import uniform
 
-            #Inizializzazione dei pesi a valori casuali (distr. uniforme).
-            self.weights = [uniform(0,ValMax) for i in range(dim + 1)]
+            #Inizializzazione dei pesi a valori casuali (distr. uniforme) con fan-in (EDIT).
+            rang = 2*ValMax/fanIn
+            self.weights = [uniform(-rang,rang) for i in range(dim + 1)]
 
 
         else:
@@ -73,11 +76,12 @@ class Unit(object):
         fval = self.f.getf(net)
         return fval
 
+
 #Sottoclasse delle unità hidden.
 class HiddenUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax, f : ActivFunct, weights: list = None):
-        super().__init__(pos,dim,ValMax,f, weights)
+    def __init__(self, pos, dim, ValMax, f : ActivFunct, weights: list = None, fanIn = 2):
+        super().__init__(pos,dim,ValMax,f, weights,fanIn)
 
     #costruisce il delta da usare nell'algoritmo di backpropagation
     #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
@@ -98,9 +102,9 @@ class HiddenUnit(Unit):
 #Sottoclasse delle unità di output.
 class OutputUnit(Unit):
 
-    def __init__(self, pos, dim, ValMax, f : ActivFunct, weights: list = None):
-        super().__init__(pos,dim,ValMax,f, weights)
-    
+    def __init__(self, pos, dim, ValMax, f : ActivFunct, weights: list = None, fanIn = 2):
+        super().__init__(pos,dim,ValMax,f, weights, fanIn)
+        
     #costruisce il delta da usare nell'algoritmo di backpropagation
     #targetOut: valore di target che associato all'input
     #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
@@ -152,16 +156,16 @@ class NeuralNetwork(object):
                 if not isinstance(el, TRInput and OneOfKTRInput) or el.getLength() != length:
                     raise ValueError ("TR set not valid: not homogeneous")
             self.layers.append(trainingSet.copy())
+            fanIn = self.layers[0][0].len()+1
 
         #Creazione delle hidden units.
         for j in range(self.noHiddLayers):
             if weights == None:
-                hiddenList = [HiddenUnit(j+1,length,self.hyp['ValMax'], self.f) for i in range(self.hyp['HiddenUnits'])]
+                hiddenList = [HiddenUnit(i,length,self.hyp['ValMax'], self.f,fanIn=fanIn) for i in range(self.hyp['HiddenUnits'])]
                 self.layers.append(hiddenList)
-                
             else:
                 if len(weights[0]) == self.hyp["HiddenUnits"]:
-                    hiddenList = [HiddenUnit(j+1,length,self.hyp['ValMax'], self.f, weights[0][i]) for i in range(self.hyp['HiddenUnits'])]
+                    hiddenList = [HiddenUnit(i,length,self.hyp['ValMax'], self.f, weights[0][i],fanIn=fanIn) for i in range(self.hyp['HiddenUnits'])]
                     self.layers.append(hiddenList)
                 else:
                     raise ValueError("NN __init__: weights[0] len")
@@ -169,11 +173,11 @@ class NeuralNetwork(object):
 
         #Creazione delle output units.
         if weights == None:
-            outputList = [OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax'], self.f) for i in range(self.hyp['OutputUnits'])]
+            outputList = [OutputUnit(i,length,self.hyp['ValMax'], self.f,fanIn=fanIn) for i in range(self.hyp['OutputUnits'])]
             self.layers.append(outputList)
         else:
             if len(weights[1]) == self.hyp["OutputUnits"]:
-                outputList = [OutputUnit(self.noHiddLayers+1,length,self.hyp['ValMax'], self.f, weights[1][i]) for i in range(self.hyp['OutputUnits'])]
+                outputList = [OutputUnit(i,length,self.hyp['ValMax'], self.f, weights[1][i],fanIn=fanIn) for i in range(self.hyp['OutputUnits'])]
                 self.layers.append(outputList)
             else:
                 raise ValueError("NN __init__: weights[1] len")
@@ -184,25 +188,32 @@ class NeuralNetwork(object):
             momentum = self.hyp["momRate"]
             learnRate = self.hyp["learnRate"]
             regRate = self.hyp["regRate"]
-            oldWeightsRatioOut = scipy.zeros(((len(self.layers[2]), len(self.layers[1])+ 1)))
+            oldWeightsRatioOut = scipy.zeros((len(self.layers[2]), len(self.layers[1])+ 1))
             oldWeightsRatioHidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
-            i = 0
-            lErr = [self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct)**2 for i in range(self.hyp['OutputUnits'])]
-            err = math.sqrt(sum(lErr))
-            while(i < self.hyp["MaxIter"]  and err > self.hyp["Tolerance"]):
+            it = 0
+            errList = list()
+            lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
+            err = linalg.norm(lErr,2)
+            errList.append(err)
+            while(it < self.hyp["MaxIter"]  and err > self.hyp["Tolerance"]):
                 if mode == ModeLearn.BATCH:
-                    t1 = time.time_ns()
                     self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate)
-                    t2 = time.time_ns()
-                    res = t2 - t1
                 elif mode == ModeLearn.MINIBATCH:
                     raise NotImplementedError
                 elif mode == ModeLearn.ONLINE:
                     raise NotImplementedError
 
-                lErr = [self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct)**2 for i in range(self.hyp['OutputUnits'])]
-                err = math.sqrt(sum(lErr))
-                i += 1
+                lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                err = linalg.norm(lErr,2)
+                errList.append(err)
+                if(it % 100 == 0):
+                    graphic.plot(scipy.array(errList))
+                    graphic.show()
+                it += 1
+                
+            
+            graphic.plot(scipy.array(errList))
+            graphic.show()
         else:
             raise NotImplementedError ("Deep learning models not already implemented.")
     
@@ -229,7 +240,6 @@ class NeuralNetwork(object):
     #unità di output (Att: i va da 0 ad OutputUnits-1!) con la funzione L (loss)
     # eventualmente assegnata, default=LMS e fattore di riscalamento k.
     def getError(self, data : list, i : int, k, L= None):
-        
         if L == None:
             L = lambda target,value: (target - value)**2
         #Controllo di validità dei dati.
@@ -252,21 +262,21 @@ class NeuralNetwork(object):
         return k*s
 
     #region Thread Deltas utils
-    def getHiddenOut(self, unit: HiddenUnit, input):
-        return unit.getOutput(input)
+    def getHiddenOut(self, unit: HiddenUnit, inp):
+        return unit.getOutput(inp)
         
-    def getDeltaOut(self, unit: OutputUnit, input, target):
-        return unit.getDelta(target, input)
+    def getDeltaOut(self, unit: OutputUnit, inp, target):
+        return unit.getDelta(target, inp)
 
     def getDeltaHidden(self, unit: HiddenUnit, input, deltaList, outUnits: list):
         weights = list()
         hiddenUnitIndex = self.layers[1].index(unit)
         for outUnit in outUnits:
             if isinstance(outUnit, OutputUnit):
-                weights.append(outUnit.getWeight(hiddenUnitIndex))
+                #EDIT: hiddenUnitIndex+1
+                weights.append(outUnit.getWeight(hiddenUnitIndex+1))
             else:
                 raise ValueError("in getDeltaHidden, outUnits type error")   
-
         return unit.getDelta(input, deltaList, weights)
 
     #endregion
@@ -284,30 +294,7 @@ class NeuralNetwork(object):
 
         if not isinstance(inp, TRInput and OneOfKTRInput):
             raise ValueError ("inserted input is not valid!")
-        """
-        if nThread <= 0:
-        #calcolo ouput delle unità hidden, che costituiscono l'input per le unità output
-            pool = ThreadPool()
-        else:
-            pool = ThreadPool(nThread)
-        hiddenOutResults = pool.map(functools.partial(self.getHiddenOut, input=inp.getInput()), self.layers[1])
-        pool.close()
-        pool.join()
-        
-        #calcolo dei delta delle unità di output
-        pool = ThreadPool()
-        targetOut = inp.getTarget()
-        deltaOutResults = pool.map(functools.partial(self.getDeltaOut, target=targetOut,input=hiddenOutResults), self.layers[2])
-        pool.close()
-        pool.join()
 
-        #calcolo dei delta delle unità hidden
-        pool = ThreadPool()
-        deltaHiddenResults = pool.map(functools.partial(self.getDeltaHidden, input=inp.getInput(), deltaList=deltaOutResults, outUnits=self.layers[2]), self.layers[1])
-        pool.close()
-        pool.join()
-
-"""
         if nThread == 0:
             hiddenOutResults = list()
             for unit in self.layers[1]:
@@ -322,7 +309,8 @@ class NeuralNetwork(object):
             for unit in self.layers[1]:
                 wList = list()
                 for out in self.layers[2]:
-                    wList.append(out.weights[unit.pos + 1])
+                    #EDIT: corretto significato di pos
+                    wList.append(out.getWeight(unit.pos + 1))
                 deltaHiddenResults.append(unit.getDelta(inp.getInput(), deltaOutResults, wList))
             result = (deltaOutResults, deltaHiddenResults)
             return result
@@ -333,14 +321,14 @@ class NeuralNetwork(object):
             else:
                 pool = ThreadPool(nThread)
 
-            hiddenOutResults = pool.map(functools.partial(self.getHiddenOut, input=inp.getInput()), self.layers[1])
+            hiddenOutResults = pool.map(functools.partial(self.getHiddenOut, inp=inp.getInput()), self.layers[1])
             pool.close()
             pool.join()
             
             #calcolo dei delta delle unità di output
             pool = ThreadPool()
             targetOut = inp.getTarget()
-            deltaOutResults = pool.map(functools.partial(self.getDeltaOut, target=targetOut,input=hiddenOutResults), self.layers[2])
+            deltaOutResults = pool.map(functools.partial(self.getDeltaOut, target=targetOut,inp=hiddenOutResults), self.layers[2])
             pool.close()
             pool.join()
 
@@ -380,9 +368,8 @@ class NeuralNetwork(object):
                     #Input
                     outj = inp.getInput()[j-1]
 
-                ratio_W_i_j_partial = learnRate * delta[i] * outj
-
-                ratio_W[i,j] += ratio_W_i_j_partial + momRate * oldWeightsRatio[i,j]
+                #EDIT: tolta aggiunta della componente momentum.
+                ratio_W[i,j] += learnRate * delta[i] * outj
 
         return ratio_W
     """
@@ -401,13 +388,18 @@ class NeuralNetwork(object):
 
         #scorro sugli input
         for inp in self.layers[0]:
-            (outDelta, hiddenDelta) = self.getDeltas(inp, 3)
+            (outDelta, hiddenDelta) = self.getDeltas(inp, 0)
 
             ratio_W_Out = self.updateRatio(2, oldWeightsRatioOut, ratio_W_Out, outDelta, inp, learnRate, momRate)
             ratio_W_Hidden = self.updateRatio(1, oldWeightsRatioHidden, ratio_W_Hidden, hiddenDelta, inp, learnRate, momRate)
 
         ratio_W_Out /= len(self.layers[0])
         ratio_W_Hidden /= len(self.layers[0])
+
+        #EDIT: posta l'aggiunta della componente momentum solo dopo aver scorso tutti gli input.
+        ratio_W_Out += momRate * oldWeightsRatioOut
+        ratio_W_Hidden += momRate * oldWeightsRatioHidden
+
         oldWeightsRatioOut = ratio_W_Out
         oldWeightsRatioHidden = ratio_W_Hidden
 
@@ -435,11 +427,7 @@ a3=OneOfKAttribute(2,1)
 i2=OneOfKTRInput([a1,a2],True)
 i3=OneOfKInput([a1,a2,a3])
 
-#prova con sigmoid
-def sigmoid(a,x): 
-    return 1/(1+(exp(-a*x)))
-
-f = ActivFunct(sigmoid,[1])
+f = ActivFunct(param=[3])
 
 il=[i1,i2]
 n = NeuralNetwork(il,f)
@@ -494,10 +482,10 @@ print(nn2.getOutput(i1))
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
-trainingSet = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+trainingSet = DataSet("monks-2.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':100})
+
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':2, 'MaxIter':500, 'learnRate':1, 'ValMax':0.7, 'momRate':0.5, 'regRate': 0})
 neruale.learn(ModeLearn.BATCH)
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
-

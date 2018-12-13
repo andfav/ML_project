@@ -32,10 +32,8 @@ class Unit(object):
         if weights == None:
             from random import uniform
 
-            #Inizializzazione dei pesi a valori casuali (distr. uniforme) con fan-in (EDIT).
             rang = 2*ValMax/fanIn
             self.weights = [uniform(-rang,rang) for i in range(dim + 1)]
-
 
         else:
             if len(weights) == dim+1:
@@ -104,7 +102,8 @@ class OutputUnit(Unit):
 
     def __init__(self, pos, dim, ValMax, f : ActivFunct, weights: list = None, fanIn = 2):
         super().__init__(pos,dim,ValMax,f, weights, fanIn)
-        
+    
+    
     #costruisce il delta da usare nell'algoritmo di backpropagation
     #targetOut: valore di target che associato all'input
     #derivative: derivata prima di f (da vedere se esiste qualche libreria per calcolarla)
@@ -133,7 +132,7 @@ class NeuralNetwork(object):
                     'HiddenUnits':  2,
                     'OutputUnits':  1,
                     'MaxIter': 10e4,
-                    'Tolerance': 10e-8}
+                    'Tolerance': 10e-4}
 
         #Aggiornamento degli iperparametri.
         for key in new_hyp:
@@ -147,13 +146,19 @@ class NeuralNetwork(object):
         self.noHiddLayers = self.hyp['HiddenLayers']
         self.f = f
 
+        b1 = isinstance(trainingSet[0], TRInput)
+        b2 = isinstance(trainingSet[0], OneOfKTRInput)
+        b = b1 or b2
         #Inserimento del training set.
-        if len(trainingSet) == 0 or not isinstance(trainingSet[0], TRInput and OneOfKTRInput):
+        if len(trainingSet) == 0 or not b:
             raise ValueError ("inserted TR set is not valid!")
         else:
             length = trainingSet[0].getLength()
             for el in trainingSet:
-                if not isinstance(el, TRInput and OneOfKTRInput) or el.getLength() != length:
+                b1 = isinstance(el, TRInput)
+                b2 = isinstance(el, OneOfKTRInput)
+                b = b1 or b2
+                if not b or el.getLength() != length:
                     raise ValueError ("TR set not valid: not homogeneous")
             self.layers.append(trainingSet.copy())
             fanIn = self.layers[0][0].len()+1
@@ -191,13 +196,13 @@ class NeuralNetwork(object):
             oldWeightsRatioOut = scipy.zeros((len(self.layers[2]), len(self.layers[1])+ 1))
             oldWeightsRatioHidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
             it = 0
-            errList = list()
+            vecErr = []
             lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
             err = linalg.norm(lErr,2)
-            errList.append(err)
+            vecErr.append(err)
             while(it < self.hyp["MaxIter"]  and err > self.hyp["Tolerance"]):
                 if mode == ModeLearn.BATCH:
-                    self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate)
+                    self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate) 
                 elif mode == ModeLearn.MINIBATCH:
                     raise NotImplementedError
                 elif mode == ModeLearn.ONLINE:
@@ -205,15 +210,13 @@ class NeuralNetwork(object):
 
                 lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
-                errList.append(err)
-                if(it % 100 == 0):
-                    graphic.plot(scipy.array(errList))
-                    graphic.show()
+                vecErr.append(err)
                 it += 1
+                if it % 100 == 0:
+                    graphic.plot(scipy.array(vecErr),'--')
+                    graphic.show()
+                    print(err)
                 
-            
-            graphic.plot(scipy.array(errList))
-            graphic.show()
         else:
             raise NotImplementedError ("Deep learning models not already implemented.")
     
@@ -243,12 +246,18 @@ class NeuralNetwork(object):
         if L == None:
             L = lambda target,value: (target - value)**2
         #Controllo di validità dei dati.
-        if len(data) == 0 or not isinstance(data[0], TRInput and OneOfKTRInput):
+        b1 = isinstance(data[0], TRInput)
+        b2 = isinstance(data[0], OneOfKTRInput)
+        b = b1 or b2
+        if len(data) == 0 or not b:
             raise ValueError ("inserted set is not valid!")
         else:
             length = data[0].getLength()
             for el in data:
-                if not isinstance(el, TRInput and OneOfKTRInput) or el.getLength() != length:
+                b1 = isinstance(el, TRInput)
+                b2 = isinstance(el, OneOfKTRInput)
+                b = b1 or b2
+                if not b or el.getLength() != length:
                     raise ValueError ("data set not valid: not homogeneous")
 
         #Controllo di validità dell'indice i.
@@ -270,10 +279,9 @@ class NeuralNetwork(object):
 
     def getDeltaHidden(self, unit: HiddenUnit, input, deltaList, outUnits: list):
         weights = list()
-        hiddenUnitIndex = self.layers[1].index(unit)
+        hiddenUnitIndex = unit.pos
         for outUnit in outUnits:
             if isinstance(outUnit, OutputUnit):
-                #EDIT: hiddenUnitIndex+1
                 weights.append(outUnit.getWeight(hiddenUnitIndex+1))
             else:
                 raise ValueError("in getDeltaHidden, outUnits type error")   
@@ -292,7 +300,11 @@ class NeuralNetwork(object):
     def getDeltas(self, inp: Input, nThread: int = -1):
         import functools
 
-        if not isinstance(inp, TRInput and OneOfKTRInput):
+        b1 = isinstance(inp, TRInput)
+        b2 = isinstance(inp, OneOfKTRInput)
+        b = b1 or b2
+
+        if not b:
             raise ValueError ("inserted input is not valid!")
 
         if nThread == 0:
@@ -309,7 +321,6 @@ class NeuralNetwork(object):
             for unit in self.layers[1]:
                 wList = list()
                 for out in self.layers[2]:
-                    #EDIT: corretto significato di pos
                     wList.append(out.getWeight(unit.pos + 1))
                 deltaHiddenResults.append(unit.getDelta(inp.getInput(), deltaOutResults, wList))
             result = (deltaOutResults, deltaHiddenResults)
@@ -341,17 +352,16 @@ class NeuralNetwork(object):
             return result
 
 
-    def updateRatio(self, layer: int, oldWeightsRatio: scipy.array, ratio_W: scipy.array, delta: list, inp: Input, learnRate, momRate):
+    def updateRatio(self, layer: int, ratio_W: scipy.array, delta: list, inp: Input, learnRate):
         if layer > 2 or layer < 1:
             raise ValueError("in updateRatio 1 <= layer <= 2")
 
-    
         #itero sulle unità del livello corrente
         for unit in self.layers[layer]:
 
             #itero sui pesi della unità selezionata
             for weight in unit.weights:
-                i = self.layers[layer].index(unit)
+                i = unit.pos
                 j = unit.weights.index(weight)
 
                 #Memorizzo l'ouput dell'unità j del layer precedente sulla variabile outj,
@@ -368,10 +378,8 @@ class NeuralNetwork(object):
                     #Input
                     outj = inp.getInput()[j-1]
 
-                #EDIT: tolta aggiunta della componente momentum.
                 ratio_W[i,j] += learnRate * delta[i] * outj
 
-        return ratio_W
     """
     Metodo che implementa una iterazione dell'algoritmo batch backprop
 
@@ -390,13 +398,12 @@ class NeuralNetwork(object):
         for inp in self.layers[0]:
             (outDelta, hiddenDelta) = self.getDeltas(inp, 0)
 
-            ratio_W_Out = self.updateRatio(2, oldWeightsRatioOut, ratio_W_Out, outDelta, inp, learnRate, momRate)
-            ratio_W_Hidden = self.updateRatio(1, oldWeightsRatioHidden, ratio_W_Hidden, hiddenDelta, inp, learnRate, momRate)
+            self.updateRatio(2, ratio_W_Out, outDelta, inp, learnRate)
+            self.updateRatio(1, ratio_W_Hidden, hiddenDelta, inp, learnRate)
 
         ratio_W_Out /= len(self.layers[0])
         ratio_W_Hidden /= len(self.layers[0])
 
-        #EDIT: posta l'aggiunta della componente momentum solo dopo aver scorso tutti gli input.
         ratio_W_Out += momRate * oldWeightsRatioOut
         ratio_W_Hidden += momRate * oldWeightsRatioHidden
 
@@ -427,7 +434,7 @@ a3=OneOfKAttribute(2,1)
 i2=OneOfKTRInput([a1,a2],True)
 i3=OneOfKInput([a1,a2,a3])
 
-f = ActivFunct(param=[3])
+f = ActivFunct(param=[10])
 
 il=[i1,i2]
 n = NeuralNetwork(il,f)
@@ -482,10 +489,29 @@ print(nn2.getOutput(i1))
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
-trainingSet = DataSet("monks-2.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-
-
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':2, 'MaxIter':500, 'learnRate':1, 'ValMax':0.7, 'momRate':0.5, 'regRate': 0})
+trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+"""
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.006})
 neruale.learn(ModeLearn.BATCH)
+"""
+xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
+xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.001, 'MaxIter': 300})
+xorNN.learn(ModeLearn.BATCH)
+
+xorTest = DataSet("Xor.txt", " ", ModeInput.INPUT, columnSkip=[3]) 
+
+print("0 0 : "+ str(xorNN.getOutput(xorTest.inputList[0])))
+print("0 1 : "+ str(xorNN.getOutput(xorTest.inputList[1])))
+print("1 0 : "+ str(xorNN.getOutput(xorTest.inputList[2])))
+print("1 1 : "+ str(xorNN.getOutput(xorTest.inputList[3])))
+"""
+s = 0
+for d in testSet.inputList:
+    out = (neruale.getOutput(d)[0] >= 0.5)
+    s += abs(out - d.getTargetExact())
+perc = 1 - s/len(testSet.inputList)
+print("Accuratezza sul test set: " + str(perc*100) + "%.")
+"""
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)

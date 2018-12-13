@@ -1,19 +1,33 @@
+from enum import Enum
+class ModeActiv(Enum):
+    OTHER = 1
+    SIGMOIDAL = 2
+
 """
 Classe che implementa la funzione di attivazione, con relativo calcolo della derivata prima.
 """
 class ActivFunct(object):
-
     #Costruttuore: inserisco come attributo la funzione di attivazione fissati i parametri aggiuntivi.
     #ACHTUNG: i parametri aggiuntivi vanno posti in testa alla lista!
-    def __init__(self, f, param : list):
+    def __init__(self, mode=ModeActiv.SIGMOIDAL, f=None, param:list=[1]):
         from functools import partial
         from inspect import signature
+        self.mode = mode
+
+        #Funzione sigmoid.
+        def sigmoid(a,x):
+            from math import exp
+            return 1/(1+(exp(-a*x)))
+        if self.mode == ModeActiv.SIGMOIDAL:
+            self.f = sigmoid
+
+        if self.mode == ModeActiv.OTHER:
+            self.f = f
 
         #len(signature(f).parameters)-1 restituisce il numero di parametri aggiuntivi di f.
-        if len(param) == len(signature(f).parameters)-1:
-            self.f = f
+        if len(param) == len(signature(self.f).parameters)-1:
             for el in param:
-                self.f = partial(f,el)
+                self.f = partial(self.f,el)
         else:
             raise ValueError ('ActivFun: number of parameters between f and list mismatch.')
     

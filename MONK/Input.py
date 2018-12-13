@@ -222,7 +222,7 @@ class TRInput(Input):
         super().print()
         print("target "+ str(self.target))
 
-    def len(self):
+    def getLength(self):
         return len(self.vector)
             
     def copy(self):
@@ -241,8 +241,11 @@ class OneOfKTRInput(OneOfKInput):
         self.target = target
 
     #interfacing: restituisce il target associato all'input corrente.
-    def getTarget(self):
+    def getTargetExact(self):
         return self.target
+    
+    def getTarget(self):
+        return min(max(self.target,0.1),0.9)
 
     def print(self):
         for attr in self.vector:

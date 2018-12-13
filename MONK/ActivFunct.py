@@ -1,7 +1,11 @@
 from enum import Enum
+from math import exp
+import math
 class ModeActiv(Enum):
     OTHER = 1
     SIGMOIDAL = 2
+    IDENTITY = 3
+    SOFTPLUS = 4
 
 """
 Classe che implementa la funzione di attivazione, con relativo calcolo della derivata prima.
@@ -16,10 +20,23 @@ class ActivFunct(object):
 
         #Funzione sigmoid.
         def sigmoid(a,x):
-            from math import exp
+            
             return 1/(1+(exp(-a*x)))
+
+        def identity(x):
+            return x
+
+        def softplus(x):
+            return math.log(1 + exp(x))
+
         if self.mode == ModeActiv.SIGMOIDAL:
             self.f = sigmoid
+
+        if self.mode == ModeActiv.IDENTITY:
+            self.f = identity
+
+        if self.mode == ModeActiv.SOFTPLUS:
+            self.f = softplus
 
         if self.mode == ModeActiv.OTHER:
             self.f = f

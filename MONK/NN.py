@@ -8,7 +8,7 @@ from Input import Attribute, OneOfKAttribute, Input, OneOfKInput, TRInput, OneOf
 from ActivFunct import ModeActiv, ActivFunct
 from DataSet import DataSet, ModeInput
 from multiprocessing.dummy import Pool as ThreadPool
-import scipy, math, time
+import scipy, math, time, random
 import matplotlib.pyplot as graphic
 from scipy import linalg
 
@@ -196,30 +196,39 @@ class NeuralNetwork(object):
             oldWeightsRatioOut = scipy.zeros((len(self.layers[2]), len(self.layers[1])+ 1))
             oldWeightsRatioHidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
             it = 0
-            vecErr = []
+            vecErr = list()
             lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
             err = linalg.norm(lErr,2)
             vecErr.append(err)
             while(it < self.hyp["MaxIter"]  and err > self.hyp["Tolerance"]):
                 if mode == ModeLearn.BATCH:
-                    self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate) 
+                    (ratio_W_Out, ratio_W_Hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate) 
                 elif mode == ModeLearn.MINIBATCH:
                     raise NotImplementedError
                 elif mode == ModeLearn.ONLINE:
-                    raise NotImplementedError
+                    if it % len(self.layers[0]) == 0:
+                        arr = list()
+                        for el in self.layers[0]:
+                            arr.append(el)
+                        random.shuffle(arr)
+                    (ratio_W_Out, ratio_W_Hidden) = self.onlineIter(oldWeightsRatioOut, oldWeightsRatioHidden, arr.pop(0), learnRate, momentum, regRate)
 
                 lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
                 vecErr.append(err)
                 it += 1
-                if it % 100 == 0:
-                    graphic.plot(scipy.array(vecErr),'--')
-                    graphic.show()
-                    print(err)
-                
+                oldWeightsRatioOut = ratio_W_Out
+                oldWeightsRatioHidden = ratio_W_Hidden
         else:
             raise NotImplementedError ("Deep learning models not already implemented.")
+
+        return vecErr
     
+    def getPlot(self, val: list):
+        array = scipy.array(val)
+        graphic.plot(array)    
+        graphic.show()
+
     #Restituisce copia della lista rappresentante il layer i-esimo.
     def getLayer(self,i):
         if i in range(len(self.layers)):
@@ -407,20 +416,66 @@ class NeuralNetwork(object):
         ratio_W_Out += momRate * oldWeightsRatioOut
         ratio_W_Hidden += momRate * oldWeightsRatioHidden
 
-        oldWeightsRatioOut = ratio_W_Out
-        oldWeightsRatioHidden = ratio_W_Hidden
+        
 
         for i in range (len(self.layers[2])):
             for j in range (len(self.layers[1])+1):
                 w_i_j = self.layers[2][i].weights[j]
-                self.layers[2][i].weights[j] += ratio_W_Out[i,j] - regRate * w_i_j
+                if j == 0:
+                    self.layers[2][i].weights[j] += ratio_W_Out[i,j]
+                else:
+                    self.layers[2][i].weights[j] += ratio_W_Out[i,j] - regRate * w_i_j
 
         for i in range (len(self.layers[1])):
             for j in range (self.layers[0][0].len()+1):
                 w_i_j = self.layers[1][i].weights[j]
-                self.layers[1][i].weights[j] += ratio_W_Hidden[i,j] - regRate * w_i_j
+                if j == 0:
+                    self.layers[1][i].weights[j] += ratio_W_Hidden[i,j]
+                else:
+                    self.layers[1][i].weights[j] += ratio_W_Hidden[i,j] - regRate * w_i_j
 
-    
+        return (ratio_W_Out, ratio_W_Hidden)
+
+    def onlineIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array, inp, learnRate, momRate, regRate):
+
+        ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1]) + 1))
+        #Errore: in self.layers[0] ho salvato una lista di input, a me serve invece il numero
+        #di attributi del singolo input, prendo l'input in posizione 0 come riferimento visto 
+        #che ho già fatto il controllo di omogeneità in fase di inizializzazione.
+        ratio_W_Hidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
+
+        #scorro sugli input
+        
+        (outDelta, hiddenDelta) = self.getDeltas(inp, 0)
+
+        self.updateRatio(2, ratio_W_Out, outDelta, inp, learnRate)
+        self.updateRatio(1, ratio_W_Hidden, hiddenDelta, inp, learnRate)
+
+        ratio_W_Out /= len(self.layers[0])
+        ratio_W_Hidden /= len(self.layers[0])
+
+        ratio_W_Out = (1-momRate)*ratio_W_Out + momRate * oldWeightsRatioOut
+        ratio_W_Hidden = (1-momRate)*ratio_W_Hidden + momRate * oldWeightsRatioHidden
+
+        
+
+        for i in range (len(self.layers[2])):
+            for j in range (len(self.layers[1])+1):
+                w_i_j = self.layers[2][i].weights[j]
+                if j == 0:
+                    self.layers[2][i].weights[j] += ratio_W_Out[i,j]
+                else:
+                    self.layers[2][i].weights[j] += ratio_W_Out[i,j] - regRate * w_i_j
+
+        for i in range (len(self.layers[1])):
+            for j in range (self.layers[0][0].len()+1):
+                w_i_j = self.layers[1][i].weights[j]
+                if j == 0:
+                    self.layers[1][i].weights[j] += ratio_W_Hidden[i,j]
+                else:
+                    self.layers[1][i].weights[j] += ratio_W_Hidden[i,j] - regRate * w_i_j
+
+        return (ratio_W_Out, ratio_W_Hidden)
         
 #Test.
 from math import exp
@@ -491,14 +546,17 @@ columnSkip = [8]
 targetPos = 1
 trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-"""
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.006})
-neruale.learn(ModeLearn.BATCH)
-"""
-xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
-xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.001, 'MaxIter': 300})
-xorNN.learn(ModeLearn.BATCH)
 
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0.001, 'Tolerance':0.009, 'MaxIter': 1000})
+errl = neruale.learn(ModeLearn.BATCH)
+neruale.getPlot(errl)
+
+"""
+f = ActivFunct(ModeActiv.SIGMOIDAL, param = [10])
+xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
+xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':2, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0.001, 'Tolerance':0.001, 'MaxIter': 600})
+errList = xorNN.learn(ModeLearn.BATCH)
+xorNN.getPlot(errList)
 xorTest = DataSet("Xor.txt", " ", ModeInput.INPUT, columnSkip=[3]) 
 
 print("0 0 : "+ str(xorNN.getOutput(xorTest.inputList[0])))
@@ -515,3 +573,4 @@ print("Accuratezza sul test set: " + str(perc*100) + "%.")
 """
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
+"""

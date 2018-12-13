@@ -208,11 +208,11 @@ class NeuralNetwork(object):
                 lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
                 vecErr.append(err)
-                print(it)
                 it += 1
-            graphic.plot(scipy.array(vecErr),'--')
-            graphic.show()
-            print(err)
+                if it % 100 == 0:
+                    graphic.plot(scipy.array(vecErr),'--')
+                    graphic.show()
+                    print(err)
         else:
             raise NotImplementedError ("Deep learning models not already implemented.")
     
@@ -475,10 +475,10 @@ print(nn2.getOutput(i1))
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
-trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+trainingSet = DataSet("monks-3.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+testSet = DataSet("monks-3.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0})
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.006})
 neruale.learn(ModeLearn.BATCH)
 
 s = 0
@@ -486,6 +486,6 @@ for d in testSet.inputList:
     out = (neruale.getOutput(d)[0] >= 0.5)
     s += abs(out - d.getTargetExact())
 perc = 1 - s/len(testSet.inputList)
-print("Accuratezza sul test set: " + str(perc))
+print("Accuratezza sul test set: " + str(perc*100) + "%.")
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)

@@ -132,6 +132,7 @@ class NeuralNetwork(object):
                     'HiddenUnits':  2,
                     'OutputUnits':  1,
                     'MaxEpochs': 10e4,
+                    'MiniBatchSize': 100,
                     'Tolerance': 10e-4}
 
         #Aggiornamento degli iperparametri.
@@ -209,14 +210,33 @@ class NeuralNetwork(object):
                     vecErr.append(err)
                     epochs += 1
                 elif mode == ModeLearn.MINIBATCH:
-                    raise NotImplementedError
+                    #Memorizzo il numero dei mini-batches per epoch.
+                    if len(self.layers[0]) % self.hyp["MiniBatchSize"] == 0:
+                        numMb = int(len(self.layers[0]) / self.hyp["MiniBatchSize"])
+                        bla = self.hyp["MiniBatchSize"]
+                        if it % numMb == 0:
+                            if it != 0:
+                                lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                                err = linalg.norm(lErr,2)
+                                vecErr.append(err)
+                                epochs += 1
+                            it = 0
+                            arr = list()
+                            for el in self.layers[0]:
+                                arr.append(el)
+                            random.shuffle(arr)
+                            miniBatches = [arr[k*self.hyp["MiniBatchSize"] : (k+1)*self.hyp["MiniBatchSize"]] for k in range(numMb)]
+                        (ratio_W_Out, ratio_W_Hidden) = self.miniBatchIter(oldWeightsRatioOut, oldWeightsRatioHidden, miniBatches.pop(0), learnRate, momentum, regRate)
+                        it += 1
+                    else:
+                        raise ValueError ("in learn: mini-batch size not compatible with DataSet.")
                 elif mode == ModeLearn.ONLINE:
                     if it % len(self.layers[0]) == 0:
                         if it != 0:
-                            epochs += 1
                             lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
                             err = linalg.norm(lErr,2)
                             vecErr.append(err)
+                            epochs += 1
                         it = 0
                         arr = list()
                         for el in self.layers[0]:
@@ -443,6 +463,41 @@ class NeuralNetwork(object):
 
         return (ratio_W_Out, ratio_W_Hidden)
 
+    def miniBatchIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array, miniBatch: list, learnRate, momRate, regRate):
+        
+        ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1]) + 1))
+        ratio_W_Hidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
+
+        #Aggiungo il contributo di ogni elemento del mini-batch.
+        for inp in miniBatch:
+            (outDelta, hiddenDelta) = self.getDeltas(inp, 0)
+            self.updateRatio(2, ratio_W_Out, outDelta, inp, learnRate)
+            self.updateRatio(1, ratio_W_Hidden, hiddenDelta, inp, learnRate)
+
+        ratio_W_Out /= len(miniBatch)
+        ratio_W_Hidden /= len(miniBatch)
+
+        ratio_W_Out = ratio_W_Out + momRate * oldWeightsRatioOut
+        ratio_W_Hidden = ratio_W_Hidden + momRate * oldWeightsRatioHidden
+
+        for i in range (len(self.layers[2])):
+            for j in range (len(self.layers[1])+1):
+                w_i_j = self.layers[2][i].weights[j]
+                if j == 0:
+                    self.layers[2][i].weights[j] += ratio_W_Out[i,j]
+                else:
+                    self.layers[2][i].weights[j] += ratio_W_Out[i,j] - regRate * w_i_j
+
+        for i in range (len(self.layers[1])):
+            for j in range (self.layers[0][0].len()+1):
+                w_i_j = self.layers[1][i].weights[j]
+                if j == 0:
+                    self.layers[1][i].weights[j] += ratio_W_Hidden[i,j]
+                else:
+                    self.layers[1][i].weights[j] += ratio_W_Hidden[i,j] - regRate * w_i_j
+        
+        return (ratio_W_Out, ratio_W_Hidden)
+
     def onlineIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array, inp, learnRate, momRate, regRate):
 
         ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1]) + 1))
@@ -453,11 +508,8 @@ class NeuralNetwork(object):
         self.updateRatio(2, ratio_W_Out, outDelta, inp, learnRate)
         self.updateRatio(1, ratio_W_Hidden, hiddenDelta, inp, learnRate)
 
-        #ratio_W_Out /= len(self.layers[0])
-        #ratio_W_Hidden /= len(self.layers[0])
-
-        ratio_W_Out = (1 - momRate)*ratio_W_Out + momRate * oldWeightsRatioOut
-        ratio_W_Hidden = (1 - momRate)*ratio_W_Hidden + momRate * oldWeightsRatioHidden
+        ratio_W_Out = ratio_W_Out + momRate * oldWeightsRatioOut
+        ratio_W_Hidden = ratio_W_Hidden + momRate * oldWeightsRatioHidden
 
         for i in range (len(self.layers[2])):
             for j in range (len(self.layers[1])+1):
@@ -545,19 +597,19 @@ domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
 
-"""
-trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.00002, 'ValMax':0.7, 'momRate':0.1, 'regRate':0, 'Tolerance':0.009, 'MaxEpochs': 2000})
-errl = neruale.learn(ModeLearn.ONLINE)
+trainingSet = DataSet("monks-3.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+testSet = DataSet("monks-3.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.05, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.001, 'MaxEpochs': 600, 'MiniBatchSize': int(len(trainingSet.inputList)/2)})
+errl = neruale.learn(ModeLearn.MINIBATCH)
 neruale.getPlot(errl)
 
 """
 f = ActivFunct(ModeActiv.SIGMOIDAL, param = [10])
 xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
-xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.025, 'ValMax':0.7, 'momRate':0.1, 'regRate':0.001, 'Tolerance':0.001, 'MaxEpochs': 9000})
-errList = xorNN.learn(ModeLearn.ONLINE)
+xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.025, 'ValMax':0.7, 'momRate':0.1, 'regRate':0.001, 'Tolerance':0.001, 'MaxEpochs': 9000, 'MiniBatchSize': 2})
+errList = xorNN.learn(ModeLearn.MINIBATCH)
 xorNN.getPlot(errList)
 xorTest = DataSet("Xor.txt", " ", ModeInput.INPUT, columnSkip=[3]) 
 
@@ -573,6 +625,7 @@ for d in testSet.inputList:
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
 
+"""
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
 """

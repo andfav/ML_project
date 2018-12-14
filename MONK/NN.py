@@ -131,7 +131,7 @@ class NeuralNetwork(object):
                     'HiddenLayers': 1,
                     'HiddenUnits':  2,
                     'OutputUnits':  1,
-                    'MaxIter': 10e4,
+                    'MaxEpochs': 10e4,
                     'Tolerance': 10e-4}
 
         #Aggiornamento degli iperparametri.
@@ -195,28 +195,36 @@ class NeuralNetwork(object):
             regRate = self.hyp["regRate"]
             oldWeightsRatioOut = scipy.zeros((len(self.layers[2]), len(self.layers[1])+ 1))
             oldWeightsRatioHidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
+            epochs = 0
             it = 0
             vecErr = list()
             lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
             err = linalg.norm(lErr,2)
             vecErr.append(err)
-            while(it < self.hyp["MaxIter"]  and err > self.hyp["Tolerance"]):
+            while(epochs < self.hyp["MaxEpochs"]  and err > self.hyp["Tolerance"]):
                 if mode == ModeLearn.BATCH:
-                    (ratio_W_Out, ratio_W_Hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate) 
+                    (ratio_W_Out, ratio_W_Hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, learnRate, momentum, regRate)
+                    lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                    err = linalg.norm(lErr,2)
+                    vecErr.append(err)
+                    epochs += 1
                 elif mode == ModeLearn.MINIBATCH:
                     raise NotImplementedError
                 elif mode == ModeLearn.ONLINE:
                     if it % len(self.layers[0]) == 0:
+                        if it != 0:
+                            epochs += 1
+                            lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                            err = linalg.norm(lErr,2)
+                            vecErr.append(err)
+                        it = 0
                         arr = list()
                         for el in self.layers[0]:
                             arr.append(el)
                         random.shuffle(arr)
                     (ratio_W_Out, ratio_W_Hidden) = self.onlineIter(oldWeightsRatioOut, oldWeightsRatioHidden, arr.pop(0), learnRate, momentum, regRate)
+                    it += 1
 
-                lErr = scipy.array([self.getError(self.layers[0],i,1/(len(self.layers[0])),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                err = linalg.norm(lErr,2)
-                vecErr.append(err)
-                it += 1
                 oldWeightsRatioOut = ratio_W_Out
                 oldWeightsRatioHidden = ratio_W_Hidden
         else:
@@ -276,7 +284,11 @@ class NeuralNetwork(object):
         #Calcolo effettivo dell'errore.
         s = 0
         for d in data:
-            s += L(d.getTarget(),self.getOutput(d)[i])
+            if self.f.mode == ModeActiv.SIGMOIDAL:
+                target = d.getTargetSigmoidal()
+            else:
+                target = d.getTarget()
+            s += L(target,self.getOutput(d)[i])
         return k*s
 
     #region Thread Deltas utils
@@ -398,9 +410,6 @@ class NeuralNetwork(object):
     def batchIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array, learnRate, momRate, regRate):
 
         ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1]) + 1))
-        #Errore: in self.layers[0] ho salvato una lista di input, a me serve invece il numero
-        #di attributi del singolo input, prendo l'input in posizione 0 come riferimento visto 
-        #che ho già fatto il controllo di omogeneità in fase di inizializzazione.
         ratio_W_Hidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
 
         #scorro sugli input
@@ -415,8 +424,6 @@ class NeuralNetwork(object):
 
         ratio_W_Out += momRate * oldWeightsRatioOut
         ratio_W_Hidden += momRate * oldWeightsRatioHidden
-
-        
 
         for i in range (len(self.layers[2])):
             for j in range (len(self.layers[1])+1):
@@ -439,25 +446,18 @@ class NeuralNetwork(object):
     def onlineIter(self, oldWeightsRatioOut: scipy.array, oldWeightsRatioHidden: scipy.array, inp, learnRate, momRate, regRate):
 
         ratio_W_Out = scipy.zeros((len(self.layers[2]), len(self.layers[1]) + 1))
-        #Errore: in self.layers[0] ho salvato una lista di input, a me serve invece il numero
-        #di attributi del singolo input, prendo l'input in posizione 0 come riferimento visto 
-        #che ho già fatto il controllo di omogeneità in fase di inizializzazione.
         ratio_W_Hidden = scipy.zeros((len(self.layers[1]), self.layers[0][0].len() + 1))
-
-        #scorro sugli input
         
         (outDelta, hiddenDelta) = self.getDeltas(inp, 0)
 
         self.updateRatio(2, ratio_W_Out, outDelta, inp, learnRate)
         self.updateRatio(1, ratio_W_Hidden, hiddenDelta, inp, learnRate)
 
-        ratio_W_Out /= len(self.layers[0])
-        ratio_W_Hidden /= len(self.layers[0])
+        #ratio_W_Out /= len(self.layers[0])
+        #ratio_W_Hidden /= len(self.layers[0])
 
-        ratio_W_Out = (1-momRate)*ratio_W_Out + momRate * oldWeightsRatioOut
-        ratio_W_Hidden = (1-momRate)*ratio_W_Hidden + momRate * oldWeightsRatioHidden
-
-        
+        ratio_W_Out = (1 - momRate)*ratio_W_Out + momRate * oldWeightsRatioOut
+        ratio_W_Hidden = (1 - momRate)*ratio_W_Hidden + momRate * oldWeightsRatioHidden
 
         for i in range (len(self.layers[2])):
             for j in range (len(self.layers[1])+1):
@@ -544,18 +544,20 @@ print(nn2.getOutput(i1))
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
+
+"""
 trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0.001, 'Tolerance':0.009, 'MaxIter': 1000})
-errl = neruale.learn(ModeLearn.BATCH)
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.00002, 'ValMax':0.7, 'momRate':0.1, 'regRate':0, 'Tolerance':0.009, 'MaxEpochs': 2000})
+errl = neruale.learn(ModeLearn.ONLINE)
 neruale.getPlot(errl)
 
 """
 f = ActivFunct(ModeActiv.SIGMOIDAL, param = [10])
 xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
-xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':2, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0.001, 'Tolerance':0.001, 'MaxIter': 600})
-errList = xorNN.learn(ModeLearn.BATCH)
+xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.025, 'ValMax':0.7, 'momRate':0.1, 'regRate':0.001, 'Tolerance':0.001, 'MaxEpochs': 9000})
+errList = xorNN.learn(ModeLearn.ONLINE)
 xorNN.getPlot(errList)
 xorTest = DataSet("Xor.txt", " ", ModeInput.INPUT, columnSkip=[3]) 
 
@@ -567,10 +569,10 @@ print("1 1 : "+ str(xorNN.getOutput(xorTest.inputList[3])))
 s = 0
 for d in testSet.inputList:
     out = (neruale.getOutput(d)[0] >= 0.5)
-    s += abs(out - d.getTargetExact())
+    s += abs(out - d.getTarget())
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
-"""
+
 #ValueError: Inserted input is not valid for this NN!
 #n.getOutput(i3)
 """

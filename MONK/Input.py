@@ -218,6 +218,9 @@ class TRInput(Input):
     def getTarget(self):
         return self.target
 
+    def getTargetSigmoidal(self):
+        return min(max(self.target,0.1),0.9)
+
     def print(self):
         super().print()
         print("target "+ str(self.target))
@@ -241,10 +244,10 @@ class OneOfKTRInput(OneOfKInput):
         self.target = target
 
     #interfacing: restituisce il target associato all'input corrente.
-    def getTargetExact(self):
+    def getTarget(self):
         return self.target
     
-    def getTarget(self):
+    def getTargetSigmoidal(self):
         return min(max(self.target,0.1),0.9)
 
     def print(self):

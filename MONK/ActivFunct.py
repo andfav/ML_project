@@ -34,9 +34,11 @@ class ActivFunct(object):
 
         if self.mode == ModeActiv.IDENTITY:
             self.f = identity
+            param = []
 
         if self.mode == ModeActiv.SOFTPLUS:
             self.f = softplus
+            param = []
 
         if self.mode == ModeActiv.OTHER:
             self.f = f

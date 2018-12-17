@@ -34,13 +34,13 @@ class Unit(object):
             if isinstance(f, Sigmoidal):
                 rang = 2*ValMax/fanIn
 
-                #self.bias = random.uniform(-rang, rang)#peso relativo al bias
+                self.bias = random.uniform(-rang, rang)#peso relativo al bias
                 
                 weightsList = [random.uniform(-rang,rang) for i in range(dim)]
 
             else:
                 
-                #self.bias = random.uniform(-ValMax, ValMax)#peso relativo al bias
+                self.bias = random.uniform(-ValMax, ValMax)#peso relativo al bias
                 
                 weightsList = [random.uniform(-ValMax,ValMax) for i in range(dim)]
 
@@ -49,7 +49,7 @@ class Unit(object):
         else:
             if len(weights) == dim:
                 self.weights = np.array(weights)
-                #self.bias = bias
+                self.bias = bias
             else:
                 raise ValueError("weights dim")
 
@@ -65,7 +65,7 @@ class Unit(object):
         if len(inp) == self.dim:
             
             result = (np.dot(self.weights, inp))
-            #result += self.bias
+            result += self.bias
             if type(result) == np.int32:
                 return int(result)
             else:
@@ -243,15 +243,12 @@ class NeuralNetwork(object):
                 (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.onlineIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, arr.pop(0), learnRate, momentum, regRate)
                 it += 1
 
-            for i in range(0, len(self.outputLayer)):
-                for j in range(0, len(self.hiddenLayer)):
-                    oldWeightsRatioOut[i,j] = ratio_W_Out[i,j]
-                oldratio_Bias_out[i] = ratio_Bias_out[i]
+            
+            oldWeightsRatioOut = ratio_W_Out
+            oldratio_Bias_out = ratio_Bias_out
 
-            for i in range(0, len(self.hiddenLayer)):
-                for j in range(0, self.inputLayer[0].getLength()):
-                    oldWeightsRatioHidden[i, j] = ratio_W_Hidden[i, j]
-                oldratio_Bias_hidden[i] = ratio_Bias_hidden[i]
+            oldWeightsRatioHidden = ratio_W_Hidden
+            oldratio_Bias_hidden = ratio_Bias_hidden
 
         
             """
@@ -371,7 +368,6 @@ class NeuralNetwork(object):
 
             for hUnit in self.hiddenLayer:
                 t = hUnit.pos
-                val = inp.getInput()
                 ratio_W_Hidden[t] += learnRate*deltaHiddenResults[t]*inp.getInput()
                 ratio_Bias_hidden[t] += learnRate*deltaHiddenResults[t]
 
@@ -389,19 +385,19 @@ class NeuralNetwork(object):
         ratio_W_Out += momRate * oldWeightsRatioOut
         ratio_W_Hidden += momRate * oldWeightsRatioHidden
         ratio_Bias_out += momRate * oldBiasRatioOut
-        ratio_Bias_hidden += momRate + oldBiasRatioHidden
+        ratio_Bias_hidden += momRate * oldBiasRatioHidden
 
         #aggiornamento pesi unità di output
         for oUnit in self.outputLayer:
             t = oUnit.pos
             oUnit.weights = oUnit.weights + ratio_W_Out[t] - regRate*oUnit.weights
-            #oUnit.bias = oUnit.bias + ratio_Bias_out[t] - regRate*oUnit.bias
+            oUnit.bias = oUnit.bias + ratio_Bias_out[t]
 
         #aggiornamento pesi unità hidden layer
         for hUnit in self.hiddenLayer:
             t = hUnit.pos
             hUnit.weights = hUnit.weights + ratio_W_Hidden[t] - regRate*hUnit.weights
-            #hUnit.bias = hUnit.bias + ratio_Bias_hidden[t] - regRate*hUnit.bias
+            hUnit.bias = hUnit.bias + ratio_Bias_hidden[t]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
     
@@ -466,157 +462,37 @@ class NeuralNetwork(object):
         ratio_W_Out = (1 - momRate)*ratio_W_Out + momRate * oldWeightsRatioOut
         ratio_W_Hidden = (1 - momRate)*ratio_W_Hidden + momRate * oldWeightsRatioHidden
         ratio_Bias_out = (1-momRate)*ratio_Bias_out + momRate * oldBiasRatioOut
-        ratio_Bias_hidden = (1-momRate)+ratio_Bias_hidden + momRate * oldBiasRatioHidden
+        ratio_Bias_hidden = (1-momRate)*ratio_Bias_hidden + momRate * oldBiasRatioHidden
 
         #aggiornamento pesi unità di output
         for oUnit in self.outputLayer:
             t = oUnit.pos
             oUnit.weights = oUnit.weights + ratio_W_Out[t] - regRate*oUnit.weights
-            oUnit.bias = oUnit.bias + ratio_Bias_out[t] - regRate*oUnit.bias
+            oUnit.bias = oUnit.bias + ratio_Bias_out[t]
 
         #aggiornamento pesi unità hidden layer
         for hUnit in self.hiddenLayer:
             t = hUnit.pos
             hUnit.weights = hUnit.weights + ratio_W_Hidden[t] - regRate*hUnit.weights
-            hUnit.bias = hUnit.bias + ratio_Bias_hidden[t] - regRate*hUnit.bias
+            hUnit.bias = hUnit.bias + ratio_Bias_hidden[t]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
     
 #Test.
-f = Identity()
+f = Sigmoidal(8)
 
-o1 = OutputUnit(0, 2, 0.5, f, weights=[1,0.5], bias=1)
-h1 = HiddenUnit(0, 7, 0.5, f, weights=[1,1,1,1,1,1,1], bias=1)
-h2 = HiddenUnit(1, 7, 0.5, f, weights=[1,0,1,0,1,0,1], bias=1)
-
-a1 = OneOfKAttribute(4, 3)
-a2 = OneOfKAttribute(3, 1)
-i1 = OneOfKTRInput([a1, a2], 1)
-
-net1 = h1.getNet(i1.getInput())
-print(str(type(net1)))
-out1 = h1.getOutput(i1.getInput())
-
-net2 = h2.getNet(i1.getInput())
-out2 = h2.getOutput(i1.getInput())
-
-o1Input = np.array([out1, out2])
-net3 = o1.getNet(o1Input)
-out3 = o1.getOutput(o1Input)
-
-d1 = o1.getDelta(0, o1Input)
-d2 = h1.getDelta(i1.getInput(), np.array([d1]), np.array([o1.getWeight(0)]))
-d3 = h2.getDelta(i1.getInput(), np.array([d1]), np.array([o1.getWeight(1)]))
-"""
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
 targetPos = 1
-trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-"""
-f = Sigmoidal(10)
 
-xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
-xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.2, 'ValMax':0.7, 'momRate':0.4, 'regRate':0.001, 'Tolerance':0.001, 'MaxEpochs': 1000})
-errList = xorNN.learn(ModeLearn.BATCH)
-xorNN.getPlot(errList)
-xorTest = DataSet("Xor.txt", " ", ModeInput.INPUT, columnSkip=[3]) 
+trainingSet = DataSet("monks-2.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
+testSet = DataSet("monks-2.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-print("0 0 : "+ str(xorNN.getOutput(xorTest.inputList[0])))
-print("0 1 : "+ str(xorNN.getOutput(xorTest.inputList[1])))
-print("1 0 : "+ str(xorNN.getOutput(xorTest.inputList[2])))
-print("1 1 : "+ str(xorNN.getOutput(xorTest.inputList[3])))
-"""
-
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.3, 'regRate':0.001, 'Tolerance':0.009, 'MaxEpochs': 500})
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.005, 'MaxEpochs': 6000})
 errl = neruale.learn(ModeLearn.BATCH)
 neruale.getPlot(errl)
-testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-s = 0
-for d in testSet.inputList:
-    out = (neruale.getOutput(d)[0] >= 0.5)
-    s += abs(out - d.getTarget())
-perc = 1 - s/len(testSet.inputList)
-print("Accuratezza sul test set: " + str(perc*100) + "%.")
-
-
-a1=OneOfKAttribute(5,3)
-a2=OneOfKAttribute(4,2)
-i1=OneOfKTRInput([a1,a2],False)
-
-a1=OneOfKAttribute(5,1)
-a2=OneOfKAttribute(4,3)
-a3=OneOfKAttribute(2,1)
-i2=OneOfKTRInput([a1,a2],True)
-i3=OneOfKInput([a1,a2,a3])
-
-f = ActivFunct(param=[10])
-
-il=[i1,i2]
-n = NeuralNetwork(il,f)
-out = n.getOutput(i2)
-print(out)
-print(n.getError([i2],0,1))
-
-l = i2.getInput()
-linp = list()
-for el in l:
-    linp.append(int(el))
-print("\n\n\n\nsigmoid")
-print("input: "+str(linp)) 
-
-outUnit = OutputUnit(1, 1, 0.2, f)
-hiddenUnit = HiddenUnit(1, len(linp), 0.2, f)
-
-hout = list()
-hout.append(hiddenUnit.getOutput(linp))
-onet = outUnit.getNet(hout)
-outputOut = outUnit.getOutput(hout)
-outputDelta = outUnit.getDelta(1, hout)
-
-print("output delta:" +str(outputDelta))
-hnet = hiddenUnit.getNet(linp)
-hiddenDelta = hiddenUnit.getDelta(linp, [outputDelta], [1])
-print("hidden delta:" +str(hiddenDelta))
-
-result = n.getDeltas(i1)
-
-print (result)
-
-weights = list()
-a = OneOfKAttribute(1, 1)
-i1 = OneOfKTRInput([a], True)
-il = [i1]
-weights.append(list())
-l = list()
-for i in range(0, 2):
-    l.append(1)
-
-weights[0] = [l, l]
-
-l2 = [1, 1, 1]
-weights.append(list())
-weights[1] = [l2]
-
-nn2 = NeuralNetwork(il, f, weights= weights)
-print(nn2.getOutput(i1))
-
-
-domains = [3, 3, 2, 3, 4, 2]
-columnSkip = [8]
-targetPos = 1
 
 """
-"""
-trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.00002, 'ValMax':0.7, 'momRate':0.1, 'regRate':0, 'Tolerance':0.009, 'MaxEpochs': 2000})
-errl = neruale.learn(ModeLearn.ONLINE)
-neruale.getPlot(errl)
-"""
-"""
-f = ActivFunct(ModeActiv.SIGMOIDAL, param = [10])
 xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
 xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.025, 'ValMax':0.7, 'momRate':0.1, 'regRate':0.001, 'Tolerance':0.001, 'MaxEpochs': 9000})
 errList = xorNN.learn(ModeLearn.ONLINE)
@@ -628,7 +504,7 @@ print("0 1 : "+ str(xorNN.getOutput(xorTest.inputList[1])))
 print("1 0 : "+ str(xorNN.getOutput(xorTest.inputList[2])))
 print("1 1 : "+ str(xorNN.getOutput(xorTest.inputList[3])))
 """
-"""
+
 s = 0
 for d in testSet.inputList:
     out = (neruale.getOutput(d)[0] >= 0.5)
@@ -636,6 +512,4 @@ for d in testSet.inputList:
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
 
-#ValueError: Inserted input is not valid for this NN!
-#n.getOutput(i3)
-"""
+

@@ -36,7 +36,7 @@ class Sigmoidal(ActivFunct):
         return 1/(1+(exp(power)))
 
     def getDerivative(self, x):
-        return self.getf(x)*(1- self.getf(x))
+        return self.alfa*self.getf(x)*(1- self.getf(x))
 
 class Identity(ActivFunct):
     def __init__(self):

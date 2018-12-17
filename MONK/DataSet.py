@@ -1,4 +1,4 @@
-from Input import Attribute, Input, TRInput, OneOfKAttribute, OneOfKInput, OneOfKTRInput
+from Input import Input, TRInput, OneOfKAttribute, OneOfKInput, OneOfKTRInput
 
 """
 Classe, che dato un file in input, mi costruisce l'insieme dei dati di training
@@ -56,9 +56,9 @@ class DataSet(object):
                             #target value
                             if targetPos == (j+1):
                                 if mode == ModeInput.ONE_OF_K_TR_INPUT:
-                                    target = (int(parsedLine[j]) > 0)
+                                    target = int(parsedLine[j])
                                 elif mode == ModeInput.TR_INPUT:
-                                    target = (float(parsedLine[j]))
+                                    target = float(parsedLine[j])
 
                             else:
                                 
@@ -72,7 +72,7 @@ class DataSet(object):
                                         raise ValueError("all domains value must be > 0")
                                 
                                 elif mode == ModeInput.INPUT or mode == ModeInput.TR_INPUT:
-                                    attr = Attribute(float(parsedLine[j]))
+                                    attr = float(parsedLine[j])
                                     attList.append(attr)
 
                     if mode == ModeInput.TR_INPUT:
@@ -99,17 +99,9 @@ class DataSet(object):
         except IOError:
             raise
 
-    
-
-
     #restituisce la lista degli input
     def getInputs(self):
-        inputs = list()
-
-        for inp in self.inputList:
-            inputs.append(inp.copy())
-
-        return inputs
+        return self.inputList
 
 """
 domains = [3, 3, 2, 3, 4, 2]

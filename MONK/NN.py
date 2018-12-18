@@ -203,7 +203,7 @@ class NeuralNetwork(object):
                 raise ValueError("NN __init__: weights[1] len")
     
     #Esegue backpropagation e istruisce la rete settando i pesi.
-    def learn(self, mode:ModeLearn, errorFunct = None):
+    def learn(self, mode:ModeLearn, errorFunct = None, miniBatchDim = None):
         momentum = self.hyp["momRate"]
         learnRate = self.hyp["learnRate"]
         regRate = self.hyp["regRate"]
@@ -221,29 +221,68 @@ class NeuralNetwork(object):
         vecErr.append(err)
         while(epochs < self.hyp["MaxEpochs"]  and err > self.hyp["Tolerance"]):
             if mode == ModeLearn.BATCH:
+                #Esecuzione di un'iterazione (l'intero data set).
                 (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, learnRate, momentum, regRate)
+
+                #Aggiornamento del contatore epochs e dell'errore.
                 lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
                 vecErr.append(err)
                 epochs += 1
             elif mode == ModeLearn.MINIBATCH:
-                raise NotImplementedError
+                #Controllo inserimento della miniBatchDim e casting ad int.
+                if miniBatchDim == None:
+                    raise ValueError ("in learn: miniBatchDim not inserted.")
+                miniBatchDim = int(miniBatchDim)
+
+                if len(self.inputLayer) % miniBatchDim == 0:
+                    #Memorizzo il numero dei mini-batches per epoch.
+                    numMb = int(len(self.inputLayer) / miniBatchDim)
+
+                    if it % numMb == 0:
+                        #Aggiornamento del contatore epochs e dell'errore.
+                        if it != 0:
+                            lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                            err = linalg.norm(lErr,2)
+                            vecErr.append(err)
+                            epochs += 1
+                        it = 0
+
+                        #Rimescolamento del training set.
+                        arr = list()
+                        for el in self.inputLayer:
+                            arr.append(el)
+                        random.shuffle(arr)
+
+                        #Creazione dei mini-batches.
+                        miniBatches = [arr[k*miniBatchDim : (k+1)*miniBatchDim] for k in range(numMb)]
+
+                    #Esecuzione di un'iterazione (un mini-batch).
+                    (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.miniBatchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, miniBatches.pop(0), learnRate, momentum, regRate)
+                    it += 1
+                else:
+                    raise ValueError ("in learn: mini-batch size not compatible with DataSet.")
             elif mode == ModeLearn.ONLINE:
                 if it % len(self.inputLayer) == 0:
+                    #Aggiornamento del contatore epochs e dell'errore.
                     if it != 0:
                         epochs += 1
                         lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                         err = linalg.norm(lErr,2)
                         vecErr.append(err)
                     it = 0
+
+                    #Rimescolamento del training set.
                     arr = list()
                     for el in self.inputLayer:
                         arr.append(el)
                     random.shuffle(arr)
+
+                #Esecuzione di un'iterazione (un solo dato del training set).
                 (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.onlineIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, arr.pop(0), learnRate, momentum, regRate)
                 it += 1
 
-            
+            #Aggiornamento degli old ratios.
             oldWeightsRatioOut = ratio_W_Out
             oldratio_Bias_out = ratio_Bias_out
 
@@ -402,6 +441,92 @@ class NeuralNetwork(object):
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
     
     """
+    Metodo che implementa una iterazione dell'algoritmo mini-batch backprop
+
+    -arguments
+        oldWeightsRatioOut: np.array delle variazioni dei pesi delle unità di output all'iterazione precedente
+        oldWeightsRatioHidden: np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
+        oldBiasRatioOut: np.array delle variazioni dei bias delle unità di output all'iterazione precedente
+        oldBiasRatioOut: np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
+        minBatch: mini-batch corrente
+        learnRate: learning rate
+        momRate: alfa del momentum
+        regRate: lambda della regolarizzazione
+
+    -return
+        (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden): variazioni calcolate sull'iterazione corrente
+    """
+
+    def miniBatchIter(self, oldWeightsRatioOut: np.array, oldWeightsRatioHidden: np.array, oldBiasRatioOut: np.array, oldBiasRatioHidden: np.array, minBatch: list, learnRate, momRate, regRate):
+
+        ratio_W_Out = np.zeros((len(self.outputLayer), len(self.hiddenLayer)))
+        ratio_W_Hidden = np.zeros((len(self.hiddenLayer), self.inputLayer[0].getLength()))
+        ratio_Bias_out = np.zeros((len(self.outputLayer), 1))
+        ratio_Bias_hidden = np.zeros((len(self.hiddenLayer), 1))
+
+        #scorro sugli input
+        for inp in minBatch:
+
+            #calcolo gli output forniti dalle unità hidden
+            hiddenOutResultsList = list()
+            for unit in self.hiddenLayer:
+                hiddenOutResultsList.append(unit.getOutput(inp.getInput()))
+
+            hiddenOutResults = np.array(hiddenOutResultsList)
+            
+            #calcolo i delta relativi alle unità di output
+            deltaOutResultsList = list()
+            for unit in self.outputLayer:
+                deltaOutResultsList.append(unit.getDelta(inp.getTarget(), hiddenOutResults))
+
+            deltaOutResults = np.array(deltaOutResultsList)
+
+            #calcolo i delta relativi alle unità di hidden
+            deltaHiddenResultsList = list()
+            for unit in self.hiddenLayer:
+                wList = list()
+                for out in self.outputLayer:
+                    wList.append(out.getWeight(unit.pos))
+                deltaHiddenResultsList.append(unit.getDelta(inp.getInput(), deltaOutResults, np.array(wList)))
+
+            deltaHiddenResults = np.array(deltaHiddenResultsList)
+
+            for hUnit in self.hiddenLayer:
+                t = hUnit.pos
+                ratio_W_Hidden[t] += learnRate*deltaHiddenResults[t]*inp.getInput()
+                ratio_Bias_hidden[t] += learnRate*deltaHiddenResults[t]
+
+            for oUnit in self.outputLayer:
+                t = oUnit.pos
+                ratio_W_Out[t] += learnRate*deltaOutResults[t]*hiddenOutResults
+                ratio_Bias_out[t] += learnRate*deltaOutResults[t]
+
+            
+        ratio_W_Out /= len(minBatch)
+        ratio_W_Hidden /= len(minBatch)
+        ratio_Bias_out /= len(minBatch)
+        ratio_Bias_hidden /= len(minBatch)
+
+        ratio_W_Out += momRate * oldWeightsRatioOut
+        ratio_W_Hidden += momRate * oldWeightsRatioHidden
+        ratio_Bias_out += momRate * oldBiasRatioOut
+        ratio_Bias_hidden += momRate * oldBiasRatioHidden
+
+        #aggiornamento pesi unità di output
+        for oUnit in self.outputLayer:
+            t = oUnit.pos
+            oUnit.weights = oUnit.weights + ratio_W_Out[t] - regRate*oUnit.weights
+            oUnit.bias = oUnit.bias + ratio_Bias_out[t]
+
+        #aggiornamento pesi unità hidden layer
+        for hUnit in self.hiddenLayer:
+            t = hUnit.pos
+            hUnit.weights = hUnit.weights + ratio_W_Hidden[t] - regRate*hUnit.weights
+            hUnit.bias = hUnit.bias + ratio_Bias_hidden[t]
+
+        return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
+
+    """
     Metodo che implementa una iterazione dell'algoritmo online backprop
 
     -arguments
@@ -488,8 +613,8 @@ targetPos = 1
 trainingSet = DataSet("monks-2.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-2.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.005, 'MaxEpochs': 6000})
-errl = neruale.learn(ModeLearn.BATCH)
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.005, 'MaxEpochs': 10000})
+errl = neruale.learn(ModeLearn.MINIBATCH,miniBatchDim=len(trainingSet.inputList)/13)
 neruale.getPlot(errl)
 
 """

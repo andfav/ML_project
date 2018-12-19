@@ -48,6 +48,8 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta:dict, errorFunct = Non
         
         #In parallelo creo, istruisco le reti, calcolo gli errori sui possibili folders.
         errore = pool.map(partial(task_cv_single,modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim),poolList)
+        pool.close()
+        pool.join()
 
         #Restituisco l'errore medio.    
         err = sum(errore)/k

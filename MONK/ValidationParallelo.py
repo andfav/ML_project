@@ -2,7 +2,6 @@ from DataSet import DataSet, ModeInput
 from NN import NeuralNetwork, ModeLearn
 from ActivFunct import ActivFunct, Sigmoidal, Identity
 from concurrent.futures import ThreadPoolExecutor
-from multiprocessing.dummy import Pool as ThreadPool
 from functools import partial
 import random as rnd
 import time
@@ -28,8 +27,8 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
         folderDim = int(len(dataSet) / k)
         folder = [dataSet[i*folderDim : (i+1)*folderDim] for i in range(k)]
         errore = list()
-        pool = ThreadPool(k)
-        inputList = list()
+        pool = ThreadPoolExecutor(max_workers=k)
+        futureList = list()
         for i in range (len(folder)):
             lcopy = folder.copy()
             del(lcopy[i])
@@ -39,17 +38,16 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
             for j in range (len (lcopy)):
                 trSet+= lcopy[j]
             nn = NeuralNetwork(trSet, f, theta)
-            inputList.append((nn, vlSet))
-        errore = pool.map(partial(task_cv_single, modeLearn= modeLearn, errorFunct=errorFunct, miniBatchDim=miniBatchDim), inputList)
-        pool.close()
-        pool.join()
+            
+            futureList.append(pool.submit(partial(task_cv_single, nn=nn, vlSet=vlSet,modeLearn= modeLearn, errorFunct=errorFunct, miniBatchDim=miniBatchDim)))
+        for el in futureList:
+            errore.append(el.result())
         err = sum(errore)/k
         return err
     else:
         raise ValueError("k must divide data set length")
 
-def task_cv_single(inp, modeLearn: ModeLearn, errorFunct:ActivFunct, miniBatchDim = None):
-    (nn, vlSet) = inp
+def task_cv_single(nn, vlSet, modeLearn: ModeLearn, errorFunct:ActivFunct, miniBatchDim = None):
     nn.learn(modeLearn, errorFunct, miniBatchDim)
     e = nn.getError(vlSet, 0, 1/len(vlSet), errorFunct)
     return e

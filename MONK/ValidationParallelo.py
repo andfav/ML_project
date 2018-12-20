@@ -1,7 +1,7 @@
 from DataSet import DataSet, ModeInput
 from NN import NeuralNetwork, ModeLearn
 from ActivFunct import ActivFunct, Sigmoidal, Identity
-from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import random as rnd
 import numpy as np
@@ -31,7 +31,7 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta:dict, errorFunct = Non
         folder = [dataSet[i*folderDim : (i+1)*folderDim] for i in range(k)]
 
         errore = list()
-        pool = Pool(k)
+        pool = ProcessPoolExecutor(k)
         poolList = list()
         for i in range (len(folder)):
             lcopy = folder.copy()
@@ -47,9 +47,7 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta:dict, errorFunct = Non
             poolList.append((trSet,vlSet))
         
         #In parallelo creo, istruisco le reti, calcolo gli errori sui possibili folders.
-        errore = pool.map(partial(task_cv_single,modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim),poolList)
-        pool.close()
-        pool.join()
+        errore = list(pool.map(partial(task_cv_single,modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim),poolList))
 
         #Restituisco l'errore medio.    
         err = sum(errore)/k

@@ -35,26 +35,27 @@ def k_fold_CV_single(workers: int, k: int, dataSet, f:ActivFunct, theta:dict, er
         folder = [dataSet[i*folderDim : (i+1)*folderDim] for i in range(k)]
 
         errore = list()
-        pool = ProcessPoolExecutor(min(k, workers))
-        poolList = list()
-        for i in range (len(folder)):
-            lcopy = folder.copy()
-            del(lcopy[i])
-
-            #Creo validation e training set.
-            vlSet = folder[i]
-            trSet = list()
-            for j in range(len(lcopy)):
-                trSet+= lcopy[j]
-            
-            #Aggiorno la poolList.
-            poolList.append((trSet,vlSet))
         
-        #In parallelo creo, istruisco le reti, calcolo gli errori sui possibili folders.
-        errore = list(pool.map(partial(task_cv_single,modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim),poolList))
+        poolList = list()
+        with ProcessPoolExecutor(max_workers=min(k, workers)) as pool:
+            for i in range (len(folder)):
+                lcopy = folder.copy()
+                del(lcopy[i])
 
-        #Restituisco l'errore medio.    
-        err = sum(errore)/k
+                #Creo validation e training set.
+                vlSet = folder[i]
+                trSet = list()
+                for j in range(len(lcopy)):
+                    trSet+= lcopy[j]
+                
+                #Aggiorno la poolList.
+                poolList.append((trSet,vlSet))
+        
+            #In parallelo creo, istruisco le reti, calcolo gli errori sui possibili folders.
+            errore = list(pool.map(partial(task_cv_single,modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim),poolList))
+
+            #Restituisco l'errore medio.    
+            err = sum(errore)/k
         return err
     else:
         raise ValueError("k must divide data set length")
@@ -93,11 +94,8 @@ def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:
     if workers <= 0:
         workers = 1
     
-    
-    pool = ProcessPoolExecutor(workers)
-    
     dictionaries = list()
-
+ 
     #generazione di tutte le possibili combinazioni
     for eta in learnRate:
         for alfa in momRate:
@@ -109,29 +107,28 @@ def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:
                                 for epsilon in Tolerance:
                                     theta = {'learnRate':eta, 'momRate':alfa, 'regRate':lambd, 'ValMax':maxVal, 'HiddenUnits':hUnit, 'OutputUnits':oUnit, 'MaxEpochs':epochs, 'Tolerance':epsilon}
                                     dictionaries.append(theta)
-    
-    res = list()
-    future = list()
-    for theta in dictionaries:
-        future.append(pool.submit(partial(cross_validation_iterator, workers=2, nFolder=nFolder, dataSet=dataSet.copy(), f=f, theta=theta, errorFunct=errorFunct, modeLearn=modeLearn, miniBatchDim=miniBatchDim)))
 
-    pool.terminate()
-    for elem in future:
-        res.append(elem.result())
+        res = list()
+        future = list()
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            for theta in dictionaries:
+                future.append(pool.submit(partial(cross_validation_iterator, workers=2, nFolder=nFolder, dataSet=dataSet.copy(), f=f, theta=theta, errorFunct=errorFunct, modeLearn=modeLearn, miniBatchDim=miniBatchDim)))
+
+            for elem in future:
+                res.append(elem.result())
 
     return res
     
 def cross_validation_iterator(workers: int, nFolder: int, dataSet, f:ActivFunct, theta:dict, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, nIter: int = 10):
-    pool = ProcessPoolExecutor(min(workers, nIter))
-
     future = list()
-    for i in range(0, nIter):
-        future.append(pool.submit(partial(k_fold_CV_single, workers=2, k=nFolder, dataSet=dataSet, modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim)))
+    with ProcessPoolExecutor(max_workers=min(workers, nIter)) as pool:
+        for i in range(0, nIter):
+            future.append(pool.submit(partial(k_fold_CV_single, workers=2, k=nFolder, dataSet=dataSet, modeLearn=modeLearn, f=f, theta=theta, errorFunct=errorFunct, miniBatchDim=miniBatchDim)))
 
-    
-    errore = list()
-    for elem in future:
-        errore.append(elem.result())
+        
+        errore = list()
+        for elem in future:
+            errore.append(elem.result())
 
     return (theta, sum(errore)/nIter)
 

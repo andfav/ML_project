@@ -99,34 +99,35 @@ param:
     Tolerance: lista di tutti i possibili valori che il parametro Tolerance della rete neurale può assumere all'interno della cross validation
     miniBatchDim: dimensione di ciascun minibatch (se modeLearn = Minibatch)
 """
-def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:ActivFunct, errorFunct:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:int, MaxEpochs:list, Tolerance:list, startTime, miniBatchDim= None):
+def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:ActivFunct, errorFunct:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:list, MaxEpochs:list, Tolerance:list, startTime, miniBatchDim= None):
     if workers <= 0:
         workers = 1
     
     dictionaries = list()
  
     #generazione di tutte le possibili combinazioni
-    for maxVal in ValMax:
+    for eta in learnRate:
         for alfa in momRate:
             for lambd in regRate:
-                for eta in learnRate:
+                for maxVal in ValMax:
                     for hUnit in HiddenUnits:
-                        for epochs in MaxEpochs:
-                            for epsilon in Tolerance:                                
-                                theta = {'learnRate':eta, 'momRate':alfa, 'regRate':lambd, 'ValMax':maxVal, 'HiddenUnits':hUnit, 'OutputUnits':OutputUnits, 'MaxEpochs':epochs, 'Tolerance':epsilon}
-                                dictionaries.append(theta)
+                        for oUnit in OutputUnits:
+                            for epochs in MaxEpochs:
+                                for epsilon in Tolerance:
+                                    theta = {'learnRate':eta, 'momRate':alfa, 'regRate':lambd, 'ValMax':maxVal, 'HiddenUnits':hUnit, 'OutputUnits':oUnit, 'MaxEpochs':epochs, 'Tolerance':epsilon}
+                                    dictionaries.append(theta)
 
-        totalTheta = len(dictionaries)
-        print("Configurazioni totali di iperparametri: "+str(totalTheta))
+    totalTheta = len(dictionaries)
+    print("Configurazioni totali di iperparametri: "+str(totalTheta))
 
-        res = list()
-        future = list()
-        with ProcessPoolExecutor(max_workers=6) as pool:
-            for theta in dictionaries:
-                future.append(pool.submit(partial(cross_validation_iterator, nIter=10, workers=workers, nFolder=nFolder, dataSet=dataSet.copy(), f=f, theta=theta, startTime=startTime, errorFunct=errorFunct, modeLearn=modeLearn, miniBatchDim=miniBatchDim)))
+    res = list()
+    future = list()
+    with ProcessPoolExecutor(max_workers=10) as pool:
+        for theta in dictionaries:
+            future.append(pool.submit(partial(cross_validation_iterator, nIter=10, workers=workers, nFolder=nFolder, dataSet=dataSet.copy(), f=f, theta=theta, startTime=startTime, errorFunct=errorFunct, modeLearn=modeLearn, miniBatchDim=miniBatchDim)))
 
-            for elem in future:
-                res.append(elem.result())
+        for elem in future:
+            res.append(elem.result())
 
     return res
     
@@ -164,7 +165,7 @@ if __name__ == '__main__':
     trainingSet = DataSet(datasetFileName, " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
     theta = {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.037, 'MaxEpochs': 600}
     start = time.time()
-    e = cross_validation(60, 8, ModeLearn.BATCH, trainingSet.getInputs(), f, None, [0.1, 0.075, 0.05, 0.025, 0.01], [0.7, 0.6, 0.5, 0.4, 0.3], [0.01, 0.005, 0], [0.7], [2, 3, 4, 5], 1, [1000], [0.006], start, None)
+    e = cross_validation(1, 10, ModeLearn.BATCH, trainingSet.getInputs(), f, None, [0.1, 0.075, 0.05, 0.025, 0.01], [0.7, 0.6, 0.5], [0.01, 0.005, 0], [0.7], [3, 4, 5], [1], [1000], [0.001], start, None)
     stop = time.time() 
     secdiff = stop - start
 

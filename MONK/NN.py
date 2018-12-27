@@ -7,10 +7,11 @@ Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 from Input import OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
 from ActivFunct import ActivFunct, Sigmoidal, Identity
 from DataSet import DataSet, ModeInput
+from multiprocessing.dummy import Pool as ThreadPool
 import math, time, random
 import numpy as np
 import matplotlib.pyplot as graphic
-from numpy import linalg
+from scipy import linalg
 
 from enum import Enum
 class ModeLearn(Enum):
@@ -212,30 +213,60 @@ class NeuralNetwork(object):
         oldratio_Bias_out = np.zeros((len(self.outputLayer), 1))
         oldratio_Bias_hidden = np.zeros((len(self.hiddenLayer), 1))
 
+        #Inizializzazione di contatori di epochs ed iterazioni.
         epochs = 0
         it = 0
+
+        #Inizializzazione delle liste degli errori/accuratezze.
         vecErr = list()
+        vecAcc = list()
         vecVlErr = list()
+        vecVlAcc = list()
+
+        #Costruzione della funzione di accuratezza (solo per problemi di classificazione).
+        if isinstance(self.f,Sigmoidal):
+            def accFunct(target,value):
+                if value >= 0.5:
+                    value = 0.9
+                else:
+                    value = 0.1
+                return (target == value)
+        else:
+            accFunct = None
+        
+        #Inserimento dell'errore/accuratezza iniziale.
         lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
         err = linalg.norm(lErr,2)
+        if accFunct != None:
+            vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
         if validationSet != None:
             vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
             vlerr = linalg.norm(vlErr,2)
             vecVlErr.append(vlerr)
+            if accFunct != None:
+                vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+        
         while(epochs < self.hyp["MaxEpochs"]  and err > self.hyp["Tolerance"]):
             if mode == ModeLearn.BATCH:
                 #Esecuzione di un'iterazione (l'intero data set).
                 (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, learnRate, momentum, regRate)
 
-                #Aggiornamento del contatore epochs e dell'errore.
+                #Aggiornamento del contatore epochs e dell'errore/accuratezza sul trainingSet.
+                epochs += 1
                 lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
                 vecErr.append(err)
+                if accFunct != None:
+                    vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+
+                #Aggiornamento dell'errore/accuratezza su un eventuale validationSet inserito.
                 if validationSet != None:
                     vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                     vlerr = linalg.norm(vlErr,2)
                     vecVlErr.append(vlerr)
-                epochs += 1
+                    if accFunct != None:
+                        vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+                
             elif mode == ModeLearn.MINIBATCH:
                 #Controllo inserimento della miniBatchDim e casting ad int.
                 if miniBatchDim == None:
@@ -247,15 +278,22 @@ class NeuralNetwork(object):
                     numMb = int(len(self.inputLayer) / miniBatchDim)
 
                     if it % numMb == 0:
-                        #Aggiornamento del contatore epochs e dell'errore.
+                        #Aggiornamento del contatore epochs e dell'errore/accuratezza.
                         if it != 0:
                             lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                             err = linalg.norm(lErr,2)
                             vecErr.append(err)
+                            if accFunct != None:
+                                vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+
+                            #Errore/accuratezza su un eventuale validationSet.
                             if validationSet != None:
                                 vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                                 vlerr = linalg.norm(vlErr,2)
                                 vecVlErr.append(vlerr)
+                                if accFunct != None:
+                                    vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+
                             epochs += 1
                         it = 0
 
@@ -275,16 +313,22 @@ class NeuralNetwork(object):
                     raise ValueError ("in learn: mini-batch size not compatible with DataSet.")
             elif mode == ModeLearn.ONLINE:
                 if it % len(self.inputLayer) == 0:
-                    #Aggiornamento del contatore epochs e dell'errore.
+                    #Aggiornamento del contatore epochs e dell'errore/accuratezza.
                     if it != 0:
                         epochs += 1
                         lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                         err = linalg.norm(lErr,2)
                         vecErr.append(err)
+                        if accFunct != None:
+                            vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+
+                        #Errore/accuratezza su un eventuale validationSet.
                         if validationSet != None:
                             vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                             vlerr = linalg.norm(vlErr,2)
                             vecVlErr.append(vlerr)
+                            if accFunct != None:
+                                vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
                     it = 0
 
                     #Rimescolamento del training set.
@@ -304,12 +348,7 @@ class NeuralNetwork(object):
             oldWeightsRatioHidden = ratio_W_Hidden
             oldratio_Bias_hidden = ratio_Bias_hidden
 
-        
-            """
-            if epochs % 50 == 0:
-                self.getPlot(vecErr)
-            """
-        return (vecErr,vecVlErr)
+        return (vecErr,vecVlErr,vecAcc,vecVlAcc)
         
 
     
@@ -614,7 +653,29 @@ class NeuralNetwork(object):
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
 
-"""   
+    """
+    Metodo per il plotting veloce di grafici in serie usando matplotlib.
+    -arguments
+        vecList: lista di tuple di numpy.array, ogni tupla contiene i grafici
+        da inserire nella singola figura.
+        opt: lista di tuple di stringhe, ogni tupla contiene le opzioni di
+        plotting nei grafici da inserire nella singola figura.
+    """
+    def getPlot(self,vecList:list, opt:list):
+        if len(vecList) != len(opt):
+            raise ValueError ("In getPlot: vecList and opt dim mismatch.")
+        else:
+            for el in vecList:
+                i = vecList.index(el)
+                if len(el) != len(opt[i]):
+                    raise ValueError ("In getPlot: number of vects and options mismatch.")
+                else:
+                    for v in el:
+                        j = el.index(v)
+                        graphic.plot(v,opt[i][j])
+                graphic.show()
+
+"""
 #Test.
 f = Sigmoidal(7)
 
@@ -626,12 +687,9 @@ trainingSet = DataSet("monks-2.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetP
 testSet = DataSet("monks-2.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
 neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':3, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.5, 'regRate':0, 'Tolerance':0.0001, 'MaxEpochs': 600})
-(errl, errtr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
-graphic.plot(errl,'r')
-graphic.plot(errtr,'--')
-graphic.show()
+(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
+neruale.getPlot([[errl,errtr],[accl, acctr]],[('r','--'),('r','--')])
 """
-
 
 """
 xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 

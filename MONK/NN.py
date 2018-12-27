@@ -203,7 +203,7 @@ class NeuralNetwork(object):
                 raise ValueError("NN __init__: weights[1] len")
     
     #Esegue backpropagation e istruisce la rete settando i pesi.
-    def learn(self, mode:ModeLearn, errorFunct = None, miniBatchDim = None):
+    def learn(self, mode:ModeLearn, errorFunct = None, miniBatchDim = None, validationSet = None):
         momentum = self.hyp["momRate"]
         learnRate = self.hyp["learnRate"]
         regRate = self.hyp["regRate"]
@@ -216,9 +216,13 @@ class NeuralNetwork(object):
         epochs = 0
         it = 0
         vecErr = list()
+        vecVlErr = list()
         lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
         err = linalg.norm(lErr,2)
-        vecErr.append(err)
+        if validationSet != None:
+            vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
+            vlerr = linalg.norm(vlErr,2)
+            vecVlErr.append(vlerr)
         while(epochs < self.hyp["MaxEpochs"]  and err > self.hyp["Tolerance"]):
             if mode == ModeLearn.BATCH:
                 #Esecuzione di un'iterazione (l'intero data set).
@@ -228,6 +232,10 @@ class NeuralNetwork(object):
                 lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                 err = linalg.norm(lErr,2)
                 vecErr.append(err)
+                if validationSet != None:
+                    vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                    vlerr = linalg.norm(vlErr,2)
+                    vecVlErr.append(vlerr)
                 epochs += 1
             elif mode == ModeLearn.MINIBATCH:
                 #Controllo inserimento della miniBatchDim e casting ad int.
@@ -245,6 +253,10 @@ class NeuralNetwork(object):
                             lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                             err = linalg.norm(lErr,2)
                             vecErr.append(err)
+                            if validationSet != None:
+                                vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                                vlerr = linalg.norm(vlErr,2)
+                                vecVlErr.append(vlerr)
                             epochs += 1
                         it = 0
 
@@ -270,6 +282,10 @@ class NeuralNetwork(object):
                         lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
                         err = linalg.norm(lErr,2)
                         vecErr.append(err)
+                        if validationSet != None:
+                            vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
+                            vlerr = linalg.norm(vlErr,2)
+                            vecVlErr.append(vlerr)
                     it = 0
 
                     #Rimescolamento del training set.
@@ -294,12 +310,8 @@ class NeuralNetwork(object):
             if epochs % 50 == 0:
                 self.getPlot(vecErr)
             """
-        return vecErr
+        return (vecErr,vecVlErr)
         
-    def getPlot(self, val: list):
-        array = np.array(val)
-        graphic.plot(array)    
-        graphic.show()
 
     
     #Resituisce gli output di rete (array dei valori uscenti dalle unità di output) dato l'input inp.
@@ -602,9 +614,10 @@ class NeuralNetwork(object):
             hUnit.bias = hUnit.bias + ratio_Bias_hidden[t]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
-    
+
+   
 #Test.
-f = Sigmoidal(8)
+f = Sigmoidal(7)
 
 domains = [3, 3, 2, 3, 4, 2]
 columnSkip = [8]
@@ -613,9 +626,12 @@ targetPos = 1
 trainingSet = DataSet("monks-2.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-2.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.005, 'MaxEpochs': 10000})
-errl = neruale.learn(ModeLearn.MINIBATCH,miniBatchDim=len(trainingSet.inputList)/13)
-neruale.getPlot(errl)
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':3, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.5, 'regRate':0, 'Tolerance':0.0001, 'MaxEpochs': 600})
+(errl, errtr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
+graphic.plot(errl,'r')
+graphic.plot(errtr,'--')
+graphic.show()
+
 
 """
 xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
@@ -629,12 +645,12 @@ print("0 1 : "+ str(xorNN.getOutput(xorTest.inputList[1])))
 print("1 0 : "+ str(xorNN.getOutput(xorTest.inputList[2])))
 print("1 1 : "+ str(xorNN.getOutput(xorTest.inputList[3])))
 """
-
+"""
 s = 0
 for d in testSet.inputList:
     out = (neruale.getOutput(d)[0] >= 0.5)
     s += abs(out - d.getTarget())
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
-
+"""
 

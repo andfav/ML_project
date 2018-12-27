@@ -7,11 +7,10 @@ Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 from Input import OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
 from ActivFunct import ActivFunct, Sigmoidal, Identity
 from DataSet import DataSet, ModeInput
-from multiprocessing.dummy import Pool as ThreadPool
 import math, time, random
 import numpy as np
 import matplotlib.pyplot as graphic
-from scipy import linalg
+from numpy import linalg
 
 from enum import Enum
 class ModeLearn(Enum):

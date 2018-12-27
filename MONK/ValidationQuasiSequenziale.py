@@ -97,21 +97,50 @@ if __name__ == '__main__':
     domains = [3, 3, 2, 3, 4, 2]
     columnSkip = [8]
     targetPos = 1
-    datasetFileName = "monks-3.train"
+    datasetFileName = "monks-2.train"
     logFileName = datasetFileName + ".log"
 
     trainingSet = DataSet(datasetFileName, " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-    theta = {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.6, 'regRate':0, 'Tolerance':0.037, 'MaxEpochs': 600}
+    learnRates = [0.1, 0.05, 0.01]
+    momRates = [0.7, 0.6, 0.5]
+    regRates = [0.1, 0.01, 0.005, 0]
+    ValMaxs = [0.7]
+    HiddenUnitss = [4, 5]
+    OutputUnitss = [1]
+    MaxIterss = [600]
+    Tolerances = [0.001]
     start = time.time()
-    e = cross_validation(300, 10, ModeLearn.BATCH, trainingSet.getInputs(), f, None, [0.1, 0.05, 0.01], [0.7, 0.6, 0.5], [0.1, 0.01, 0], [0.7], [4, 5], [1], [600], [0.001], start, None)
+    e = cross_validation(300, 2, ModeLearn.BATCH, trainingSet.getInputs(), f, None, learnRates, momRates, regRates, ValMaxs, HiddenUnitss, OutputUnitss, MaxIterss, Tolerances, start, None)
     stop = time.time() 
     secdiff = stop - start
 
     log = open(logFileName,'a')
     log.write("***\n")
+    log.write("File: " + datasetFileName + ", con configurazioni di iperparametri seguenti \n")
+    log.write("learnRates: " + str(learnRates))
+    log.write('\n')
+    log.write("momRates: " + str(momRates))
+    log.write('\n')
+    log.write("regRates: " + str(regRates))
+    log.write('\n')
+    log.write("ValMaxs: " + str(ValMaxs))
+    log.write('\n')
+    log.write("HiddenUnitss: " + str(HiddenUnitss))
+    log.write('\n')
+    log.write("OutputUnitss: " + str(OutputUnitss))
+    log.write('\n')
+    log.write("MaxIterss: " + str(MaxIterss))
+    log.write('\n')
+    log.write("Tolerances: " + str(Tolerances))
+    log.write('\n\n')
+
+    log.write("Operazione di cross-validation conclusa in " + str(secdiff) + " secondi, risultati:\n")
+
     log.write(str(e) + '\n')
     log.write('\n')
     log.write("Miglior risultato: " + str(getBestResult(e)) + '\n')
     log.write('\n\n')
+
+    log.close()
 
     print("Operazione di cross-validation conclusa in " + str(secdiff) + " secondi: i dati sono stati salvati in " + logFileName + ".")

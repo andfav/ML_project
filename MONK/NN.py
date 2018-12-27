@@ -615,7 +615,7 @@ class NeuralNetwork(object):
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
 
-   
+"""   
 #Test.
 f = Sigmoidal(7)
 
@@ -631,6 +631,7 @@ neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':3, 'learnRate':
 graphic.plot(errl,'r')
 graphic.plot(errtr,'--')
 graphic.show()
+"""
 
 
 """

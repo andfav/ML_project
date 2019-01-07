@@ -7,6 +7,7 @@ import random as rnd
 import numpy as np
 from numpy.linalg import norm
 import time
+import matplotlib.pyplot as graphic
 
 def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None):
     if k <= 0:
@@ -28,6 +29,11 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
         folders[i].append(dataSet[i+h])
 
     errore = list()
+
+    #per stampare l'errore sul traininig set e sul validation set
+    trErrorPlot = list()
+    vlErrorPlot = list()
+
     for i in range (len(folders)):
         lcopy = folders.copy()
         del(lcopy[i])
@@ -37,11 +43,24 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
         for j in range (len (lcopy)):
             trSet+= lcopy[j]
         nn = NeuralNetwork(trSet, f, theta)
-        nn.learn(modeLearn, errorFunct, miniBatchDim)
+        (trErr, vlErr, trAcc, vlAcc) = nn.learn(modeLearn, errorFunct, miniBatchDim, vlSet)
+        trErrorPlot.append(trErr)
+        vlErrorPlot.append(vlErr)
         errore.append(nn.getError(vlSet, 0, 1/len(vlSet), errorFunct))
 
     err = sum(errore)/k
-    return err
+    trErrorArray = np.array(trErrorPlot[0])
+    vlErrorArray = np.array(vlErrorPlot[0])
+
+    for i in range (1, len(trErrorPlot)):
+        trErrorArray = trErrorArray + np.array(trErrorPlot[i])
+    trErrorArray = trErrorArray / k
+
+    for i in range (1, len(vlErrorPlot)):
+        vlErrorArray = vlErrorArray + np.array(vlErrorPlot[i])
+    vlErrorArray = vlErrorArray / k
+    
+    return (err, trErrorArray, vlErrorArray)
 
 def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:ActivFunct, errorFunct:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:list, MaxEpochs:list, Tolerance:list, startTime, miniBatchDim= None):
     if workers <= 0:
@@ -77,40 +96,55 @@ def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:
     
 def cross_validation_iterator(workers: int, nFolder: int, dataSet, f:ActivFunct, theta:dict, startTime, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, nIter: int = 10):
     errore = list()
+    trErrorPlot = list()
+    vlErrorPlot = list()
     for i in range(0, nIter):
-        errore.append(k_fold_CV_single(nFolder,dataSet,f,theta,errorFunct,modeLearn,miniBatchDim))
+        (err, trErr, vlErr) = k_fold_CV_single(nFolder,dataSet,f,theta,errorFunct,modeLearn,miniBatchDim)
+        errore.append(err)
+        trErrorPlot.append(trErr)
+        vlErrorPlot.append(vlErr)
 
     endTime = time.time()
     print("************")
     print("Configurazione completata, tempo: " + str(endTime - startTime))
     print(str((theta, sum(errore)/nIter)))
 
-    return (theta, sum(errore)/nIter)
+    trArray = trErrorPlot[0]
+    vlArray = vlErrorPlot[0]
+
+    for i in range (1,nIter):
+        trArray = trArray + trErrorPlot[i]
+        vlArray = vlArray + vlErrorPlot[i]
+
+    trArray = trArray / nIter
+    vlArray = vlArray / nIter
+
+    return (theta, sum(errore)/nIter, trArray, vlArray)
 
 def getBestResult(e):
     l = [e[i][1] for i in range(len(e))]
     return e[l.index(min(l))]
 
 if __name__ == '__main__':
-    f = Sigmoidal(8)
+    f = Sigmoidal(12)
 
     domains = [3, 3, 2, 3, 4, 2]
     columnSkip = [8]
     targetPos = 1
-    datasetFileName = "monks-2.train"
-    logFileName = datasetFileName + ".log"
+    datasetFileName = "monks-1.train"
+    logFileName = datasetFileName + "sigm12finalregular3.log"
 
     trainingSet = DataSet(datasetFileName, " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
-    learnRates = [0.1, 0.05, 0.01]
-    momRates = [0.7, 0.6, 0.5]
-    regRates = [0.1, 0.01, 0.005, 0]
-    ValMaxs = [0.7]
-    HiddenUnitss = [4, 5]
+    learnRates = [0.1]
+    momRates = [0.5, 0.6, 0.7]
+    regRates = [0.0019, 0.0018]
+    ValMaxs = [0.75]
+    HiddenUnitss = [6]
     OutputUnitss = [1]
-    MaxIterss = [600]
-    Tolerances = [0.001]
+    MaxIterss = [800]
+    Tolerances = [0.0001]
     start = time.time()
-    e = cross_validation(300, 2, ModeLearn.BATCH, trainingSet.getInputs(), f, None, learnRates, momRates, regRates, ValMaxs, HiddenUnitss, OutputUnitss, MaxIterss, Tolerances, start, None)
+    e = cross_validation(6, 12, ModeLearn.BATCH, trainingSet.getInputs(), f, None, learnRates, momRates, regRates, ValMaxs, HiddenUnitss, OutputUnitss, MaxIterss, Tolerances, start, None)
     stop = time.time() 
     secdiff = stop - start
 
@@ -142,5 +176,10 @@ if __name__ == '__main__':
     log.write('\n\n')
 
     log.close()
+
+    for elem in e:
+        graphic.plot(elem[2], 'r--')#tr set
+        graphic.plot(elem[3], 'b')#vl set
+        graphic.show()
 
     print("Operazione di cross-validation conclusa in " + str(secdiff) + " secondi: i dati sono stati salvati in " + logFileName + ".")

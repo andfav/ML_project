@@ -137,7 +137,7 @@ class NeuralNetwork(object):
     #Da usare in fase di testing
     #weights[0]: lista dei pesi delle hidden unit
     #weights[1]: lista dei pesi delle output unit
-    def __init__(self, trainingSet: list, f : ActivFunct, new_hyp={}, weights:list = None):
+    def __init__(self, trainingSet: list, Outputf : ActivFunct, new_hyp={}, weights:list = None, Hiddenf:ActivFunct = None):
         #Dizionario contenente i settaggi di default (ovviamente modificabili) 
         #degli iperparametri. 
         self.hyp = {'learnRate': 0.1,
@@ -160,7 +160,11 @@ class NeuralNetwork(object):
         self.hiddenLayer = list()
         self.outputLayer = list()
         self.inputLayer = list()
-        self.f = f
+        self.Outputf = Outputf
+        if Hiddenf == None:
+            self.Hiddenf = Outputf
+        else:
+            self.Hiddenf = Hiddenf
 
         b1 = isinstance(trainingSet[0], TRInput)
         b2 = isinstance(trainingSet[0], OneOfKTRInput)
@@ -181,11 +185,11 @@ class NeuralNetwork(object):
 
         #Creazione delle hidden units.
         if weights == None:
-            hiddenList = [HiddenUnit(i,length,self.hyp['ValMax'], self.f,fanIn=fanIn) for i in range(self.hyp['HiddenUnits'])]
+            hiddenList = [HiddenUnit(i,length,self.hyp['ValMax'], self.Hiddenf,fanIn=fanIn) for i in range(self.hyp['HiddenUnits'])]
             self.hiddenLayer = hiddenList
         else:
             if len(weights[0]) == self.hyp["HiddenUnits"]:
-                hiddenList = [HiddenUnit(i,length,self.hyp['ValMax'], self.f, weights[0][i],fanIn=fanIn) for i in range(self.hyp['HiddenUnits'])]
+                hiddenList = [HiddenUnit(i,length,self.hyp['ValMax'], self.Hiddenf, weights[0][i],fanIn=fanIn) for i in range(self.hyp['HiddenUnits'])]
                 self.hiddenLayer = hiddenList
             else:
                 raise ValueError("NN __init__: weights[0] len")
@@ -193,11 +197,11 @@ class NeuralNetwork(object):
 
         #Creazione delle output units.
         if weights == None:
-            outputList = [OutputUnit(i,length,self.hyp['ValMax'], self.f,fanIn=fanIn) for i in range(self.hyp['OutputUnits'])]
+            outputList = [OutputUnit(i,length,self.hyp['ValMax'], self.Outputf,fanIn=fanIn) for i in range(self.hyp['OutputUnits'])]
             self.outputLayer = outputList
         else:
             if len(weights[1]) == self.hyp["OutputUnits"]:
-                outputList = [OutputUnit(i,length,self.hyp['ValMax'], self.f, weights[1][i],fanIn=fanIn) for i in range(self.hyp['OutputUnits'])]
+                outputList = [OutputUnit(i,length,self.hyp['ValMax'], self.Outputf, weights[1][i],fanIn=fanIn) for i in range(self.hyp['OutputUnits'])]
                 self.outputLayer = outputList
             else:
                 raise ValueError("NN __init__: weights[1] len")
@@ -224,7 +228,7 @@ class NeuralNetwork(object):
         vecVlAcc = list()
 
         #Costruzione della funzione di accuratezza (solo per problemi di classificazione).
-        if isinstance(self.f,Sigmoidal):
+        if isinstance(self.Outputf,Sigmoidal):
             def accFunct(target,value):
                 if value >= 0.5:
                     value = 0.9
@@ -398,7 +402,7 @@ class NeuralNetwork(object):
         #Calcolo effettivo dell'errore.
         s = 0
         for d in data:
-            if isinstance(self.f, Sigmoidal):
+            if isinstance(self.Outputf, Sigmoidal):
                 target = d.getTargetSigmoidal()
             else:
                 target = d.getTarget()
@@ -677,6 +681,7 @@ class NeuralNetwork(object):
 
 
 #Test.
+
 f = Sigmoidal(12)
 
 domains = [3, 3, 2, 3, 4, 2]

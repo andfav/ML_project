@@ -12,21 +12,23 @@ import matplotlib.pyplot as graphic
 def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None):
     if k <= 0:
         raise ValueError ("Wrong value of num. folders inserted")
+
+    cp = dataSet.copy()
     
     #Rimescolo il data set.
-    rnd.shuffle(dataSet.copy())
+    rnd.shuffle(cp)
 
     #Costruisco la sottolista dei dati divisibile esattamente per k.
-    h = len(dataSet) - len(dataSet) % k
-    dataSetExact = dataSet[0:h]
+    h = len(cp) - len(cp) % k
+    dataSetExact = cp[0:h]
 
     #Creo la lista dei folders.
     folderDim = int(len(dataSetExact) / k)
-    folders = [dataSet[i*folderDim : (i+1)*folderDim] for i in range(k)]
+    folders = [cp[i*folderDim : (i+1)*folderDim] for i in range(k)]
 
     #Inserisco gli elementi di avanzo.
-    for i in range(len(dataSet)-h):
-        folders[i].append(dataSet[i+h])
+    for i in range(len(cp)-h):
+        folders[i].append(cp[i+h])
 
     errore = list()
 
@@ -120,6 +122,40 @@ def cross_validation_iterator(workers: int, nFolder: int, dataSet, f:ActivFunct,
     vlArray = vlArray / nIter
 
     return (theta, sum(errore)/nIter, trArray, vlArray)
+
+"""
+Funzione che implementa la double cross validation.
+Argomenti:
+- workers, numero massimo di processi attivi;
+- testFolder, numero di folder in cui dividere inizialmente il dataSet (testSet e validation + training);
+- nFolder, numero di folder di ciascuna k-fold validation;
+- dataSet, il data set;
+- f, funzione di attivazione della rete neurale;
+- theta, diziorario di tutti gli iperparametri;
+- errorFunct, funzione di valutazione dell'errore;
+
+def double_cross_validation(workers: int, testFolder: int, nFolder: int, dataSet, f:ActivFunct, theta:dict, startTime, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, nIter: int = 10):
+     if testFolder <= 1:
+        raise ValueError ("Wrong value of num. folders inserted")
+    
+    #Rimescolo il data set.
+    rnd.shuffle(dataSet.copy())
+
+    #Costruisco la sottolista dei dati divisibile esattamente per testFolder.
+    h = len(dataSet) - len(dataSet) % testFolder
+    dataSetExact = dataSet[0:h]
+
+    #Creo la lista dei folders.
+    folderDim = int(len(dataSetExact) / testFolder)
+    folders = [dataSet[i*folderDim : (i+1)*folderDim] for i in range(testFolder)]
+
+    #Inserisco gli elementi di avanzo.
+    for i in range(len(dataSet)-h):
+        folders[i].append(dataSet[i+h])
+
+    for i in range(len(folders)):
+        testSet = folders[i]
+"""
 
 def getBestResult(e):
     l = [e[i][1] for i in range(len(e))]

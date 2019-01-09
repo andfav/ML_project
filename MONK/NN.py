@@ -239,16 +239,14 @@ class NeuralNetwork(object):
             accFunct = None
         
         #Inserimento dell'errore/accuratezza iniziale.
-        lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-        err = linalg.norm(lErr,2)
+        err = self.getError(self.inputLayer,1/(len(self.inputLayer)),errorFunct)
         if accFunct != None:
-            vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+            vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
         if validationSet != None:
-            vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-            vlerr = linalg.norm(vlErr,2)
+            vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
             vecVlErr.append(vlerr)
             if accFunct != None:
-                vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+                vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
         
         while(epochs < self.hyp["MaxEpochs"]  and err > self.hyp["Tolerance"]):
             if mode == ModeLearn.BATCH:
@@ -257,19 +255,17 @@ class NeuralNetwork(object):
 
                 #Aggiornamento del contatore epochs e dell'errore/accuratezza sul trainingSet.
                 epochs += 1
-                lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                err = linalg.norm(lErr,2)
+                err = self.getError(self.inputLayer,1/(len(self.inputLayer)),errorFunct)
                 vecErr.append(err)
                 if accFunct != None:
-                    vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+                    vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
 
                 #Aggiornamento dell'errore/accuratezza su un eventuale validationSet inserito.
                 if validationSet != None:
-                    vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                    vlerr = linalg.norm(vlErr,2)
+                    vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
                     vecVlErr.append(vlerr)
                     if accFunct != None:
-                        vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+                        vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
                 
             elif mode == ModeLearn.MINIBATCH:
                 #Controllo inserimento della miniBatchDim e casting ad int.
@@ -284,19 +280,17 @@ class NeuralNetwork(object):
                     if it % numMb == 0:
                         #Aggiornamento del contatore epochs e dell'errore/accuratezza.
                         if it != 0:
-                            lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                            err = linalg.norm(lErr,2)
+                            err = self.getError(self.inputLayer,1/(len(self.inputLayer)),errorFunct)
                             vecErr.append(err)
                             if accFunct != None:
-                                vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+                                vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
 
                             #Errore/accuratezza su un eventuale validationSet.
                             if validationSet != None:
-                                vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                                vlerr = linalg.norm(vlErr,2)
+                                vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
                                 vecVlErr.append(vlerr)
                                 if accFunct != None:
-                                    vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+                                    vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
 
                             epochs += 1
                         it = 0
@@ -320,19 +314,17 @@ class NeuralNetwork(object):
                     #Aggiornamento del contatore epochs e dell'errore/accuratezza.
                     if it != 0:
                         epochs += 1
-                        lErr = np.array([self.getError(self.inputLayer,i,1/(len(self.inputLayer)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                        err = linalg.norm(lErr,2)
+                        err = self.getError(self.inputLayer,1/(len(self.inputLayer)),errorFunct)
                         vecErr.append(err)
                         if accFunct != None:
-                            vecAcc.append(self.getError(self.inputLayer,0,1/(len(self.inputLayer)),accFunct))
+                            vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
 
                         #Errore/accuratezza su un eventuale validationSet.
                         if validationSet != None:
-                            vlErr = np.array([self.getError(validationSet,i,1/(len(validationSet)),errorFunct) for i in range(self.hyp['OutputUnits'])])
-                            vlerr = linalg.norm(vlErr,2)
+                            vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
                             vecVlErr.append(vlerr)
                             if accFunct != None:
-                                vecVlAcc.append(self.getError(validationSet,0,1/(len(validationSet)),accFunct))
+                                vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
                     it = 0
 
                     #Rimescolamento del training set.
@@ -374,12 +366,12 @@ class NeuralNetwork(object):
         return np.array(hidd2outList)
         
         
-    #Calcola l'errore (rischio) empirico della lista di TRInput o OneOfKTRInput data, sulla i-esima
-    #unità di output (Att: i va da 0 ad OutputUnits-1!) con la funzione L (loss)
+    #Calcola l'errore (rischio) empirico della lista di TRInput o OneOfKTRInput data, con la funzione L (loss)
     # eventualmente assegnata, default=LMS e fattore di riscalamento k.
-    def getError(self, data : list, i : int, k, L= None):
+    def getError(self, data : list, k, L= None):
         if L == None:
-            L = lambda target,value: (target - value)**2
+            L = lambda target,value: sum((target - value)**2)
+        
         #Controllo di validità dei dati.
         b1 = isinstance(data[0], TRInput)
         b2 = isinstance(data[0], OneOfKTRInput)
@@ -394,10 +386,6 @@ class NeuralNetwork(object):
                 b = b1 or b2
                 if not b or el.getLength() != length:
                     raise ValueError ("data set not valid: not homogeneous")
-
-        #Controllo di validità dell'indice i.
-        if not i in range(self.hyp['OutputUnits']):
-            raise RuntimeError ("Index i out of bounds")
         
         #Calcolo effettivo dell'errore.
         s = 0
@@ -406,7 +394,7 @@ class NeuralNetwork(object):
                 target = d.getTargetSigmoidal()
             else:
                 target = d.getTarget()
-            s += L(target,self.getOutput(d)[i])
+            s += L(target,self.getOutput(d))
         return k*s
 
     """
@@ -692,7 +680,7 @@ trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetP
 testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
 neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':6, 'learnRate':0.1, 'ValMax':0.75, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.0001, 'MaxEpochs': 800})
-(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
+(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,errorFunct=lambda t,o: (t -o)**2,validationSet=testSet.inputList)
 neruale.getPlot([[errl,errtr],[accl, acctr]],[('r','--'),('r','--')])
 
 """

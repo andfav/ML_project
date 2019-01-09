@@ -672,15 +672,15 @@ class NeuralNetwork(object):
 
 f = Sigmoidal(12)
 
-domains = [3, 3, 2, 3, 4, 2]
+domains = [-1, 3, 3, 2, 3, 4, 2]
 columnSkip = [8]
-targetPos = 1
+targetPos = [1]
 
 trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
 neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':6, 'learnRate':0.1, 'ValMax':0.75, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.0001, 'MaxEpochs': 800})
-(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,errorFunct=lambda t,o: (t -o)**2,validationSet=testSet.inputList)
+(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
 neruale.getPlot([[errl,errtr],[accl, acctr]],[('r','--'),('r','--')])
 
 """

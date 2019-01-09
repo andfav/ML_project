@@ -48,7 +48,7 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
         (trErr, vlErr, trAcc, vlAcc) = nn.learn(modeLearn, errorFunct, miniBatchDim, vlSet)
         trErrorPlot.append(trErr)
         vlErrorPlot.append(vlErr)
-        errore.append(nn.getError(vlSet, 0, 1/len(vlSet), errorFunct))
+        errore.append(nn.getError(vlSet, 1/len(vlSet), errorFunct))
 
     err = sum(errore)/k
 

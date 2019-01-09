@@ -1,4 +1,5 @@
 from Input import Input, TRInput, OneOfKAttribute, OneOfKInput, OneOfKTRInput
+import numpy as np
 
 """
 Classe, che dato un file in input, mi costruisce l'insieme dei dati di training
@@ -20,15 +21,15 @@ class DataSet(object):
     # o no (INPUT o ONE_OF_K_INPUT)
     #targetPos: posizione dell'attrinuto target, se presente (parte da 1)
     #domains: lista di interi che indica la cardinalità dei domini dei vari attributi
-    # (domains[i] = cardinalità del dominio dell'attributo i-esimo) se è necessaria la codifica 1-of-k. 
+    # (domains[i] = cardinalità del dominio dell'attributo i-esimo) se è necessaria la codifica 1-of-k se l'attributo è un target la cardinalità sarà -1. 
     #rowSkip: lista di interi indica eventuali righe da saltare (parte da 1)
     #columnSkip: lista di interi indica eventuali attributi da saltare (parte da 1)
-    def __init__(self, filePath, splitchar, mode: ModeInput, targetPos = 0 , domains: list = None, rowSkip: list = None, columnSkip = None):
-        if (mode == ModeInput.ONE_OF_K_TR_INPUT or mode == ModeInput.TR_INPUT) and (targetPos <= 0):
-            raise ValueError("Invalid target attribute position (must be > 0)")
+    def __init__(self, filePath, splitchar, mode: ModeInput, targetPos: list = None , domains: list = None, rowSkip: list = None, columnSkip = None):
+        if (mode == ModeInput.ONE_OF_K_TR_INPUT or mode == ModeInput.TR_INPUT) and (targetPos == None):
+            raise ValueError("Invalid target attribute position must be passed as parameter")
         
-        if (mode == ModeInput.INPUT or mode == ModeInput.ONE_OF_K_INPUT) and (targetPos > 0):
-            raise ValueError("Invalid target attribute position (must be <= 0)")
+        if (mode == ModeInput.INPUT or mode == ModeInput.ONE_OF_K_INPUT) and (targetPos != None):
+            raise ValueError("Invalid target attribute position must not be passed as parameter")
 
         try:
             f = open(filePath, "r")
@@ -42,45 +43,43 @@ class DataSet(object):
                 if rowSkip == None or not i in rowSkip:
                     parsedLine = line.strip().split(splitchar)
 
-                    if targetPos > len(parsedLine):
-                        raise ValueError("Invalid target attribute position (Out of Bound)")
+                    for pos in targetPos:
+                        if pos > len(parsedLine):
+                            raise ValueError("Invalid target attribute position (Out of Bound)")
+
+                    #creo array target
+                    target = list()
+                    for pos in targetPos:
+                        if mode == ModeInput.ONE_OF_K_TR_INPUT:
+                            elem = int(parsedLine[pos-1])
+                        elif mode == ModeInput.TR_INPUT:
+                            elem = float(parsedLine[pos-1])
+                        target.append(elem)
+                    targetArray = np.array(target)
+
 
                     for j in range(0, len(parsedLine)):
                         if columnSkip == None or not (j+1) in columnSkip:
-                            attrPos: int
-                            if (targetPos-1) > j:
-                                attrPos = j
-                            else:
-                                attrPos = j-1
-
-                            #target value
-                            if targetPos == (j+1):
-                                if mode == ModeInput.ONE_OF_K_TR_INPUT:
-                                    target = int(parsedLine[j])
-                                elif mode == ModeInput.TR_INPUT:
-                                    target = float(parsedLine[j])
-
-                            else:
-                                
+                            if j+1 not in targetPos:
                                 if mode == ModeInput.ONE_OF_K_INPUT or mode == ModeInput.ONE_OF_K_TR_INPUT:
-                                    cardinality = domains[attrPos]
+                                    cardinality = domains[j]
                                     #attributo normale
                                     if cardinality > 0:
                                         attr = OneOfKAttribute(cardinality, int(parsedLine[j]))
                                         attList.append(attr)
                                     else:
-                                        raise ValueError("all domains value must be > 0")
+                                        raise ValueError("all not target domains value must be > 0")
                                 
                                 elif mode == ModeInput.INPUT or mode == ModeInput.TR_INPUT:
                                     attr = float(parsedLine[j])
                                     attList.append(attr)
 
                     if mode == ModeInput.TR_INPUT:
-                        inp = TRInput(attList, target)
+                        inp = TRInput(attList, targetArray)
                         self.inputList.append(inp)
 
                     elif mode == ModeInput.ONE_OF_K_TR_INPUT:
-                        inp = OneOfKTRInput(attList, target)
+                        inp = OneOfKTRInput(attList, targetArray)
                         self.inputList.append(inp)
 
                     elif mode == ModeInput.ONE_OF_K_INPUT:
@@ -104,9 +103,9 @@ class DataSet(object):
         return self.inputList
 
 """
-domains = [3, 3, 2, 3, 4, 2]
+domains = [-1, 3, 3, 2, 3, 4, 2]
 columnSkip = [8]
-targetPos = 1
+targetPos = [1]
 dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
 print("*************************\n\nDataset")
@@ -123,4 +122,5 @@ dati = DataSet("C:\\Users\\matte\\Desktop\\Machine Learning\\monks-1.train", " "
 print("prova skip")
 for elem in dati.getInputs():
     elem.print()
+
 """

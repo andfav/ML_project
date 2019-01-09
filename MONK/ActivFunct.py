@@ -56,7 +56,7 @@ class SoftPlus(ActivFunct):
         return log(1+exp(x))
 
     def getDerivative(self, x):
-        return exp(x) * (1/log(1+exp(x)))
+        return exp(x)/(1+exp(x))
 """
 f = Sigmoidal(0)
 

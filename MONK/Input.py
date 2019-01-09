@@ -137,7 +137,10 @@ class TRInput(Input):
         return self.target
 
     def getTargetSigmoidal(self):
-        return min(max(self.target,0.1),0.9)
+        res = list()
+        for targetEl in self.target:
+            res.append(min(max(targetEl,0.1),0.9))
+        return np.array(res)
 
     def print(self):
         super().print()

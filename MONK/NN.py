@@ -667,7 +667,7 @@ class NeuralNetwork(object):
                         graphic.plot(v,opt[i][j])
                 graphic.show()
 
-
+"""
 #Test.
 
 f = Sigmoidal(12)
@@ -682,7 +682,7 @@ testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, d
 neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':6, 'learnRate':0.1, 'ValMax':0.75, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.0001, 'MaxEpochs': 800})
 (errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
 neruale.getPlot([[errl,errtr],[accl, acctr]],[('r','--'),('r','--')])
-
+"""
 """
 xorSet = DataSet("Xor.txt", " ", ModeInput.TR_INPUT, 3) 
 xorNN = NeuralNetwork(xorSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.025, 'ValMax':0.7, 'momRate':0.1, 'regRate':0.001, 'Tolerance':0.001, 'MaxEpochs': 9000})

@@ -1,5 +1,5 @@
 from enum import Enum
-from math import exp
+from math import exp,log
 import math
 import functools
 
@@ -48,6 +48,15 @@ class Identity(ActivFunct):
     def getDerivative(self, x):
         return 1
 
+class SoftPlus(ActivFunct):
+    def __init__(self):
+        pass
+    
+    def getf(self, x):
+        return log(1+exp(x))
+
+    def getDerivative(self, x):
+        return exp(x) * (1/log(1+exp(x)))
 """
 f = Sigmoidal(0)
 

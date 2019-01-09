@@ -124,3 +124,12 @@ for elem in dati.getInputs():
     elem.print()
 
 """
+skipRow = [1,2,3,4,5,6,7,8,9,10]
+columnSkip = [1]
+target = [12,13]
+
+dati = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
+
+print("*************************\n\nDataset")
+for elem in dati.getInputs():
+    elem.print()

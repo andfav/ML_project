@@ -5,7 +5,7 @@ batch.
 Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
 from Input import OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
-from ActivFunct import ActivFunct, Sigmoidal, Identity
+from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus
 from DataSet import DataSet, ModeInput
 from multiprocessing.dummy import Pool as ThreadPool
 import math, time, random
@@ -433,7 +433,7 @@ class NeuralNetwork(object):
             #calcolo i delta relativi alle unità di output
             deltaOutResultsList = list()
             for unit in self.outputLayer:
-                deltaOutResultsList.append(unit.getDelta(inp.getTarget(), hiddenOutResults))
+                deltaOutResultsList.append(unit.getDelta(inp.getTarget()[unit.pos], hiddenOutResults))
 
             deltaOutResults = np.array(deltaOutResultsList)
 
@@ -519,7 +519,7 @@ class NeuralNetwork(object):
             #calcolo i delta relativi alle unità di output
             deltaOutResultsList = list()
             for unit in self.outputLayer:
-                deltaOutResultsList.append(unit.getDelta(inp.getTarget(), hiddenOutResults))
+                deltaOutResultsList.append(unit.getDelta(inp.getTarget()[unit.pos], hiddenOutResults))
 
             deltaOutResults = np.array(deltaOutResultsList)
 
@@ -602,7 +602,7 @@ class NeuralNetwork(object):
         #calcolo i delta relativi alle unità di output
         deltaOutResultsList = list()
         for unit in self.outputLayer:
-            deltaOutResultsList.append(unit.getDelta(inp.getTarget(), hiddenOutResults))
+            deltaOutResultsList.append(unit.getDelta(inp.getTarget()[unit.pos], hiddenOutResults))
 
         deltaOutResults = np.array(deltaOutResultsList)
 
@@ -703,4 +703,15 @@ for d in testSet.inputList:
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
 """
+outputF = Identity()
+hiddenf = Sigmoidal()
+skipRow = [1,2,3,4,5,6,7,8,9,10]
+columnSkip = [1]
+target = [12,13]
 
+trSet = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
+
+cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':10, 'learnRate':0.1, 'ValMax':0.4, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.0001, 'MaxEpochs': 800}, Hiddenf=hiddenf)
+(errl, errtr, accl, acctr) = cupNN.learn(ModeLearn.BATCH)
+graphic.plot(errl)
+graphic.show()

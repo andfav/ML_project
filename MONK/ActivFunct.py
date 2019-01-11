@@ -37,7 +37,7 @@ class Sigmoidal(ActivFunct):
     def getDerivative(self, x):
         return self.alfa*self.getf(x)*(1- self.getf(x))
 
-class SimmetricSigmoidal(ActivFunct):
+class SymmetricSigmoidal(ActivFunct):
     def __init__(self, alfa = 1, beta = 2):
         self.alfa = alfa
         self.beta = beta

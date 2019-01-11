@@ -5,7 +5,7 @@ batch.
 Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
 from Input import OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
-from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus, SimmetricSigmoidal
+from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus, SymmetricSigmoidal
 from DataSet import DataSet, ModeInput
 from multiprocessing.dummy import Pool as ThreadPool
 import math, time, random
@@ -209,7 +209,7 @@ class NeuralNetwork(object):
                 raise ValueError("NN __init__: weights[1] len")
     
     #Esegue backpropagation e istruisce la rete settando i pesi.
-    def learn(self, mode:ModeLearn, errorFunct = None, miniBatchDim = None, validationSet = None, errorVlFunct= None):
+    def learn(self, mode:ModeLearn, errorFunct = None, numMiniBatches = None, validationSet = None, errorVlFunct= None, verbose: bool = False):
         if errorVlFunct == None:
             errorVlFunct = errorFunct
 
@@ -259,7 +259,8 @@ class NeuralNetwork(object):
             if(epochs <= TauEpoch):
                 alfa = epochs/TauEpoch
             learnRate = (1-alfa)*learnRateStart + alfa*TauLearnRate
-            print("learnrate: "+str(learnRate))
+            if verbose:
+                print("learnrate: "+str(learnRate))
             if mode == ModeLearn.BATCH:
                 #Esecuzione di un'iterazione (l'intero data set).
                 (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, learnRate, momentum, regRate)
@@ -279,47 +280,51 @@ class NeuralNetwork(object):
                         vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
                 
             elif mode == ModeLearn.MINIBATCH:
-                #Controllo inserimento della miniBatchDim e casting ad int.
-                if miniBatchDim == None:
-                    raise ValueError ("in learn: miniBatchDim not inserted.")
-                miniBatchDim = int(miniBatchDim)
+                #Controllo inserimento del numero dei mini-batches e casting ad int.
+                if numMiniBatches == None:
+                    raise ValueError ("in learn: numMiniBatches not inserted.")
+                numMiniBatches = int(numMiniBatches)
 
-                if len(self.inputLayer) % miniBatchDim == 0:
-                    #Memorizzo il numero dei mini-batches per epoch.
-                    numMb = int(len(self.inputLayer) / miniBatchDim)
+                if it % numMiniBatches == 0:
+                    #Aggiornamento del contatore epochs e dell'errore/accuratezza.
+                    if it != 0:
+                        err = self.getError(self.inputLayer,1/(len(self.inputLayer)),errorFunct)
+                        vecErr.append(err)
+                        if accFunct != None:
+                            vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
 
-                    if it % numMb == 0:
-                        #Aggiornamento del contatore epochs e dell'errore/accuratezza.
-                        if it != 0:
-                            err = self.getError(self.inputLayer,1/(len(self.inputLayer)),errorFunct)
-                            vecErr.append(err)
+                        #Errore/accuratezza su un eventuale validationSet.
+                        if validationSet != None:
+                            vlerr = self.getError(validationSet,1/(len(validationSet)),errorVlFunct)
+                            vecVlErr.append(vlerr)
                             if accFunct != None:
-                                vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
+                                vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
 
-                            #Errore/accuratezza su un eventuale validationSet.
-                            if validationSet != None:
-                                vlerr = self.getError(validationSet,1/(len(validationSet)),errorVlFunct)
-                                vecVlErr.append(vlerr)
-                                if accFunct != None:
-                                    vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
+                        epochs += 1
+                    it = 0
 
-                            epochs += 1
-                        it = 0
+                    #Rimescolamento del training set.
+                    arr = self.inputLayer.copy()
+                    random.shuffle(arr)
 
-                        #Rimescolamento del training set.
-                        arr = list()
-                        for el in self.inputLayer:
-                            arr.append(el)
-                        random.shuffle(arr)
+                    #Costruisco la sottolista dei dati divisibile esattamente per numMb.
+                    h = len(arr) - len(arr) % numMiniBatches
 
-                        #Creazione dei mini-batches.
-                        miniBatches = [arr[k*miniBatchDim : (k+1)*miniBatchDim] for k in range(numMb)]
+                    #Creo la lista dei folders.
+                    miniBatchDim = int(h / numMiniBatches)
+                    miniBatches = [arr[i*miniBatchDim : (i+1)*miniBatchDim] for i in range(numMiniBatches)]
 
-                    #Esecuzione di un'iterazione (un mini-batch).
-                    (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.miniBatchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, miniBatches.pop(0), learnRate, momentum, regRate)
-                    it += 1
-                else:
-                    raise ValueError ("in learn: mini-batch size not compatible with DataSet.")
+                    #Inserisco gli elementi di avanzo.
+                    for i in range(len(arr)-h):
+                        miniBatches[i].append(arr[i+h])
+
+                #Esecuzione di un'iterazione (un mini-batch): il coefficiente di importanza è dato dal rapporto tra 
+                #la lunghezza del mini-batch corrente e la lunghezza standard dei mini-batches.
+                currentMiniBatch = miniBatches.pop(0)
+                impCoeff = len(currentMiniBatch) / miniBatchDim
+                (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.miniBatchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, currentMiniBatch, impCoeff, learnRate, momentum, regRate)
+                it += 1
+                
             elif mode == ModeLearn.ONLINE:
                 if it % len(self.inputLayer) == 0:
                     #Aggiornamento del contatore epochs e dell'errore/accuratezza.
@@ -339,9 +344,7 @@ class NeuralNetwork(object):
                     it = 0
 
                     #Rimescolamento del training set.
-                    arr = list()
-                    for el in self.inputLayer:
-                        arr.append(el)
+                    arr = self.inputLayer.copy()
                     random.shuffle(arr)
 
                 #Esecuzione di un'iterazione (un solo dato del training set).
@@ -354,7 +357,8 @@ class NeuralNetwork(object):
 
             oldWeightsRatioHidden = ratio_W_Hidden
             oldratio_Bias_hidden = ratio_Bias_hidden
-            print("epoch: "+str(epochs))
+            if verbose:
+                print("epoch: "+str(epochs))
 
         return (vecErr,vecVlErr,vecAcc,vecVlAcc)
         
@@ -503,6 +507,8 @@ class NeuralNetwork(object):
         oldBiasRatioOut: np.array delle variazioni dei bias delle unità di output all'iterazione precedente
         oldBiasRatioOut: np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
         minBatch: mini-batch corrente
+        impCoeff: coefficiente di importanza del mini-batch corrente in relazione alla sua dimensione rispetto
+                  agli altri mini-batches 
         learnRate: learning rate
         momRate: alfa del momentum
         regRate: lambda della regolarizzazione
@@ -511,7 +517,7 @@ class NeuralNetwork(object):
         (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden): variazioni calcolate sull'iterazione corrente
     """
 
-    def miniBatchIter(self, oldWeightsRatioOut: np.array, oldWeightsRatioHidden: np.array, oldBiasRatioOut: np.array, oldBiasRatioHidden: np.array, minBatch: list, learnRate, momRate, regRate):
+    def miniBatchIter(self, oldWeightsRatioOut: np.array, oldWeightsRatioHidden: np.array, oldBiasRatioOut: np.array, oldBiasRatioHidden: np.array, minBatch: list, impCoeff: float, learnRate, momRate, regRate):
 
         ratio_W_Out = np.zeros((len(self.outputLayer), len(self.hiddenLayer)))
         ratio_W_Hidden = np.zeros((len(self.hiddenLayer), self.inputLayer[0].getLength()))
@@ -569,14 +575,14 @@ class NeuralNetwork(object):
         #aggiornamento pesi unità di output
         for oUnit in self.outputLayer:
             t = oUnit.pos
-            oUnit.weights = oUnit.weights + ratio_W_Out[t] - regRate*oUnit.weights
-            oUnit.bias = oUnit.bias + ratio_Bias_out[t]
+            oUnit.weights = oUnit.weights + impCoeff * (ratio_W_Out[t] - regRate*oUnit.weights)
+            oUnit.bias = oUnit.bias + impCoeff * ratio_Bias_out[t]
 
         #aggiornamento pesi unità hidden layer
         for hUnit in self.hiddenLayer:
             t = hUnit.pos
-            hUnit.weights = hUnit.weights + ratio_W_Hidden[t] - regRate*hUnit.weights
-            hUnit.bias = hUnit.bias + ratio_Bias_hidden[t]
+            hUnit.weights = hUnit.weights + impCoeff * (ratio_W_Hidden[t] - regRate*hUnit.weights)
+            hUnit.bias = hUnit.bias + impCoeff * ratio_Bias_hidden[t]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
 
@@ -679,9 +685,9 @@ class NeuralNetwork(object):
                         graphic.plot(v,opt[i][j])
                 graphic.show()
 
-"""
-#Test.
 
+#Test.
+"""
 f = Sigmoidal(12)
 
 domains = [-1, 3, 3, 2, 3, 4, 2]
@@ -691,8 +697,8 @@ targetPos = [1]
 trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.7, 'regRate':0, 'Tolerance':0.0001, 'MaxEpochs': 800, 'TauEpoch': 300, 'TauLearnRate': 0.07})
-(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.7, 'regRate':0, 'Tolerance':0.0001, 'MaxEpochs': 800})
+(errl, errtr, accl, acctr) = neruale.learn(ModeLearn.MINIBATCH,validationSet=testSet.inputList,numMiniBatches=5, verbose=True)
 neruale.getPlot([[errl,errtr],[accl, acctr]],[('r','--'),('r','--')])
 """
 """
@@ -717,16 +723,17 @@ print("Accuratezza sul test set: " + str(perc*100) + "%.")
 """
 
 outputF = Identity()
-hiddenf = SimmetricSigmoidal()
+hiddenf = SymmetricSigmoidal()
 skipRow = [1,2,3,4,5,6,7,8,9,10]
 columnSkip = [1]
 target = [12,13]
 
 trSet = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
-trSet.restrict(0, 1)
-cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':100, 'learnRate':0.1, 'ValMax':0.4, 'momRate':0, 'regRate':0.002, 'Tolerance':0.2, 'MaxEpochs': 100, 'TauEpoch':50, 'TauLearnRate': 0.001}, Hiddenf=hiddenf)
+trSet.restrict(-1, 1)
+cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':150, 'learnRate':0.01, 'TauLearnRate':0.01, 'ValMax':0.4, 'momRate':0.8, 'regRate':0.002, 'Tolerance':0.2, 'MaxEpochs': 800}, Hiddenf=hiddenf)
 print("Learning...")
-(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.MINIBATCH, miniBatchDim=127)
+(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.MINIBATCH, numMiniBatches=7, verbose=True)
+print("Errore ultima epoch: " + str(errtr[-1]))
 
 graphic.grid(True)
 graphic.plot(errtr)

@@ -343,6 +343,7 @@ class NeuralNetwork(object):
 
             oldWeightsRatioHidden = ratio_W_Hidden
             oldratio_Bias_hidden = ratio_Bias_hidden
+            print("epoch: "+str(epochs))
 
         return (vecErr,vecVlErr,vecAcc,vecVlAcc)
         
@@ -703,16 +704,19 @@ for d in testSet.inputList:
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
 """
+"""
 outputF = Identity()
 hiddenf = Sigmoidal()
 skipRow = [1,2,3,4,5,6,7,8,9,10]
 columnSkip = [1]
 target = [12,13]
 
-trSet = DataSet("Z:\Matteo\Desktop\Machine Learning\ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
+trSet = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
 trSet.restrict(0, 1)
-cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':10, 'learnRate':0.03, 'ValMax':0.4, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.1, 'MaxEpochs': 9000}, Hiddenf=hiddenf)
+cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':20, 'learnRate':0.05, 'ValMax':0.4, 'momRate':0.6, 'regRate':0.005, 'Tolerance':0.1, 'MaxEpochs': 1000}, Hiddenf=hiddenf)
 print("Learning...")
-(errl, errtr, accl, acctr) = cupNN.learn(ModeLearn.BATCH)
-graphic.plot(errl)
+(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.BATCH)
+
+graphic.plot(errtr)
 graphic.show()
+"""

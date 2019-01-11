@@ -112,22 +112,17 @@ class DataSet(object):
         if isinstance (self.inputList[0], OneOfKInput):
             raise RuntimeError("cannot apply to one-of-k encoded input") 
 
-        isTR = False
+       
         minAttr = list() #contiene i valori minimi di tutti gli attributi
         maxAttr = list() #contiene i valori massimi di tutti gli attributi
-        minTarget = list() #contiene i valori minimi di tutti i target
-        maxTarget = list() #contiene i valori massimi di tutti i target
+        
 
-        #inizializzo minAttr, maxAttr, minTarget, maxTarget
+        #inizializzo minAttr, maxAttr
         for attr in self.inputList[0].getInput():
             minAttr.append(attr)
             maxAttr.append(attr)
 
-        if isinstance(self.inputList[0],TRInput):
-            for target in self.inputList[0].getTarget():
-                minTarget.append(target)
-                maxTarget.append(target)
-                isTR = True
+        
         ###################################################
 
         for i in range(1, len(self.inputList)):
@@ -136,30 +131,16 @@ class DataSet(object):
                 minAttr[j] = min(minAttr[j], attrArray[j])
                 maxAttr[j] = max(maxAttr[j], attrArray[j])
 
-            #controllo anche i target
-            if isTR:
-                targetArray = self.inputList[i].getTarget()
-                for j in range(len(targetArray)):
-                    minTarget[j] = min(minTarget[j], targetArray[j])
-                    maxTarget[j] = max(maxTarget[j], targetArray[j])
 
         minAttrArray = np.array(minAttr)
         maxAttrArray = np.array(maxAttr)
-        if isTR:
-            minTargetArray = np.array(minTarget)
-            maxTargetArray = np.array(maxTarget)
+        
 
         for inp in self.inputList:
             attrArray = inp.getInput()
             attrArray = ((attrArray - minAttrArray) / (maxAttrArray - minAttrArray)) * (v2-v1) + v1*(maxAttrArray - minAttrArray) / (maxAttrArray - minAttrArray)
             inp.representation = attrArray
-            if isTR:
-                targetArray = inp.getTarget()
-                targetArray = ((targetArray - minTargetArray) / (maxTargetArray - minTargetArray)) * (v2-v1) + v1*(maxTargetArray - minTargetArray) / (maxTargetArray - minTargetArray)
-                inp.target = targetArray
-        
-        if isTR:
-            return (minAttrArray, maxAttrArray, minTargetArray, maxTargetArray)
+            
         else:
             return (minAttrArray, maxAttrArray)
 
@@ -185,12 +166,12 @@ for elem in dati.getInputs():
     elem.print()
 
 """
-"""
+
 skipRow = [1,2,3,4,5,6,7,8,9,10]
 columnSkip = [1]
 target = [12,13]
 
-dati = DataSet("Z:\Matteo\Desktop\Machine Learning\ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
+dati = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
 
 print("*************************\n\nDataset")
 for elem in dati.getInputs():
@@ -201,4 +182,3 @@ dati.restrict(-1, 1)
 print("*************************\n\nDataset normlizzato")
 for elem in dati.getInputs():
     elem.print()
-"""

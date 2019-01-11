@@ -1,7 +1,7 @@
 from enum import Enum
 from math import exp,log
 import math
-import functools
+import functools, sys
 
 """
 Classe che implementa la funzione di attivazione, con relativo calcolo della derivata prima.
@@ -27,7 +27,6 @@ class ActivFunct(object):
         return self.derivative(x)
 
 class Sigmoidal(ActivFunct):
-
     def __init__(self, alfa = 1):
         self.alfa = alfa
 
@@ -37,6 +36,18 @@ class Sigmoidal(ActivFunct):
 
     def getDerivative(self, x):
         return self.alfa*self.getf(x)*(1- self.getf(x))
+
+class SimmetricSigmoidal(ActivFunct):
+    def __init__(self, alfa = 1, beta = 2):
+        self.alfa = alfa
+        self.beta = beta
+        self.sigm = Sigmoidal(self.alfa)
+
+    def getf(self,x):
+        return self.beta * self.sigm.getf(x) - self.beta/2
+    
+    def getDerivative(self,x):
+        return self.beta * self.sigm.getDerivative(x)
 
 class Identity(ActivFunct):
     def __init__(self):
@@ -57,6 +68,8 @@ class SoftPlus(ActivFunct):
 
     def getDerivative(self, x):
         return exp(x)/(1+exp(x))
+
+
 """
 f = Sigmoidal(0)
 

@@ -5,7 +5,7 @@ batch.
 Le classi sono predisposte anche al deep learning, sebbene il learn non lo sia.
 """
 from Input import OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
-from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus
+from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus, SimmetricSigmoidal
 from DataSet import DataSet, ModeInput
 from multiprocessing.dummy import Pool as ThreadPool
 import math, time, random
@@ -147,7 +147,9 @@ class NeuralNetwork(object):
                     'HiddenUnits':  2,
                     'OutputUnits':  1,
                     'MaxEpochs': 10e4,
-                    'Tolerance': 10e-4}
+                    'Tolerance': 10e-4,
+                    'TauEpoch': 1,
+                    'TauLearnRate': 0.1}
 
         #Aggiornamento degli iperparametri.
         for key in new_hyp:
@@ -207,10 +209,15 @@ class NeuralNetwork(object):
                 raise ValueError("NN __init__: weights[1] len")
     
     #Esegue backpropagation e istruisce la rete settando i pesi.
-    def learn(self, mode:ModeLearn, errorFunct = None, miniBatchDim = None, validationSet = None):
+    def learn(self, mode:ModeLearn, errorFunct = None, miniBatchDim = None, validationSet = None, errorVlFunct= None):
+        if errorVlFunct == None:
+            errorVlFunct = errorFunct
+
         momentum = self.hyp["momRate"]
-        learnRate = self.hyp["learnRate"]
+        learnRateStart = self.hyp["learnRate"]
         regRate = self.hyp["regRate"]
+        TauEpoch = self.hyp["TauEpoch"]
+        TauLearnRate = self.hyp["TauLearnRate"]
 
         oldWeightsRatioOut = np.zeros((len(self.outputLayer), len(self.hiddenLayer)))
         oldWeightsRatioHidden = np.zeros((len(self.hiddenLayer), self.inputLayer[0].getLength()))
@@ -243,12 +250,16 @@ class NeuralNetwork(object):
         if accFunct != None:
             vecAcc.append(self.getError(self.inputLayer,1/(len(self.inputLayer)),accFunct))
         if validationSet != None:
-            vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
+            vlerr = self.getError(validationSet,1/(len(validationSet)),errorVlFunct)
             vecVlErr.append(vlerr)
             if accFunct != None:
                 vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
         
         while(epochs < self.hyp["MaxEpochs"]  and err > self.hyp["Tolerance"]):
+            if(epochs <= TauEpoch):
+                alfa = epochs/TauEpoch
+            learnRate = (1-alfa)*learnRateStart + alfa*TauLearnRate
+            print("learnrate: "+str(learnRate))
             if mode == ModeLearn.BATCH:
                 #Esecuzione di un'iterazione (l'intero data set).
                 (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden) = self.batchIter(oldWeightsRatioOut, oldWeightsRatioHidden, oldratio_Bias_out, oldratio_Bias_hidden, learnRate, momentum, regRate)
@@ -262,7 +273,7 @@ class NeuralNetwork(object):
 
                 #Aggiornamento dell'errore/accuratezza su un eventuale validationSet inserito.
                 if validationSet != None:
-                    vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
+                    vlerr = self.getError(validationSet,1/(len(validationSet)),errorVlFunct)
                     vecVlErr.append(vlerr)
                     if accFunct != None:
                         vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
@@ -287,7 +298,7 @@ class NeuralNetwork(object):
 
                             #Errore/accuratezza su un eventuale validationSet.
                             if validationSet != None:
-                                vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
+                                vlerr = self.getError(validationSet,1/(len(validationSet)),errorVlFunct)
                                 vecVlErr.append(vlerr)
                                 if accFunct != None:
                                     vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
@@ -321,7 +332,7 @@ class NeuralNetwork(object):
 
                         #Errore/accuratezza su un eventuale validationSet.
                         if validationSet != None:
-                            vlerr = self.getError(validationSet,1/(len(validationSet)),errorFunct)
+                            vlerr = self.getError(validationSet,1/(len(validationSet)),errorVlFunct)
                             vecVlErr.append(vlerr)
                             if accFunct != None:
                                 vecVlAcc.append(self.getError(validationSet,1/(len(validationSet)),accFunct))
@@ -680,7 +691,7 @@ targetPos = [1]
 trainingSet = DataSet("monks-1.train", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 testSet = DataSet("monks-1.test", " ", ModeInput.ONE_OF_K_TR_INPUT, targetPos, domains, None, columnSkip)
 
-neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':6, 'learnRate':0.1, 'ValMax':0.75, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.0001, 'MaxEpochs': 800})
+neruale = NeuralNetwork(trainingSet.inputList, f, {'HiddenUnits':4, 'learnRate':0.1, 'ValMax':0.7, 'momRate':0.7, 'regRate':0, 'Tolerance':0.0001, 'MaxEpochs': 800, 'TauEpoch': 300, 'TauLearnRate': 0.07})
 (errl, errtr, accl, acctr) = neruale.learn(ModeLearn.BATCH,validationSet=testSet.inputList)
 neruale.getPlot([[errl,errtr],[accl, acctr]],[('r','--'),('r','--')])
 """
@@ -704,19 +715,19 @@ for d in testSet.inputList:
 perc = 1 - s/len(testSet.inputList)
 print("Accuratezza sul test set: " + str(perc*100) + "%.")
 """
-"""
+
 outputF = Identity()
-hiddenf = Sigmoidal()
+hiddenf = SimmetricSigmoidal()
 skipRow = [1,2,3,4,5,6,7,8,9,10]
 columnSkip = [1]
 target = [12,13]
 
 trSet = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
 trSet.restrict(0, 1)
-cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':20, 'learnRate':0.05, 'ValMax':0.4, 'momRate':0.6, 'regRate':0.005, 'Tolerance':0.1, 'MaxEpochs': 1000}, Hiddenf=hiddenf)
+cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':100, 'learnRate':0.1, 'ValMax':0.4, 'momRate':0, 'regRate':0.002, 'Tolerance':0.2, 'MaxEpochs': 100, 'TauEpoch':50, 'TauLearnRate': 0.001}, Hiddenf=hiddenf)
 print("Learning...")
-(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.BATCH)
+(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.MINIBATCH, miniBatchDim=127)
 
+graphic.grid(True)
 graphic.plot(errtr)
 graphic.show()
-"""

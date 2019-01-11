@@ -709,9 +709,10 @@ skipRow = [1,2,3,4,5,6,7,8,9,10]
 columnSkip = [1]
 target = [12,13]
 
-trSet = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
-
-cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':10, 'learnRate':0.1, 'ValMax':0.4, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.0001, 'MaxEpochs': 800}, Hiddenf=hiddenf)
+trSet = DataSet("Z:\Matteo\Desktop\Machine Learning\ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
+trSet.restrict(0, 1)
+cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':10, 'learnRate':0.03, 'ValMax':0.4, 'momRate':0.7, 'regRate':0.002, 'Tolerance':0.1, 'MaxEpochs': 9000}, Hiddenf=hiddenf)
+print("Learning...")
 (errl, errtr, accl, acctr) = cupNN.learn(ModeLearn.BATCH)
 graphic.plot(errl)
 graphic.show()

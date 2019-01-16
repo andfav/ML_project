@@ -1,15 +1,17 @@
 from DataSet import DataSet, ModeInput
 from NN import NeuralNetwork, ModeLearn
-from ActivFunct import ActivFunct, Sigmoidal, Identity
+from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus, ReLu
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import random as rnd
 import numpy as np
 from numpy.linalg import norm
-import time
+import time, math
 import matplotlib.pyplot as graphic
+def MEE (t, value): 
+        return math.sqrt (sum((value - t)**2))
 
-def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None):
+def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, errorVlFunct = None, hiddenF: ActivFunct=None):
     if k <= 0:
         raise ValueError ("Wrong value of num. folders inserted")
 
@@ -44,11 +46,12 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
         trSet = list()
         for j in range (len (lcopy)):
             trSet+= lcopy[j]
-        nn = NeuralNetwork(trSet, f, theta)
-        (trErr, vlErr, trAcc, vlAcc) = nn.learn(modeLearn, errorFunct, miniBatchDim, vlSet)
+        nn = NeuralNetwork(trSet, f, theta, Hiddenf=hiddenF)
+        (trErr, vlErr, trAcc, vlAcc) = nn.learn(modeLearn, errorFunct, miniBatchDim, vlSet, errorVlFunct=errorVlFunct)
         trErrorPlot.append(trErr)
         vlErrorPlot.append(vlErr)
-        errore.append(nn.getError(vlSet, 1/len(vlSet), errorFunct))
+        
+        errore.append(nn.getError(vlSet, 1/len(vlSet), errorVlFunct))
 
     err = sum(errore)/k
 
@@ -82,7 +85,7 @@ def k_fold_CV_single(k: int, dataSet, f:ActivFunct, theta, errorFunct = None, mo
     
     
 
-def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:ActivFunct, errorFunct:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:list, MaxEpochs:list, Tolerance:list, startTime, miniBatchDim= None):
+def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:ActivFunct, errorFunct:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:list, MaxEpochs:list, Tolerance:list, startTime, miniBatchDim= None, errorVlFunct = None, hiddenF: ActivFunct=None):
     if workers <= 0:
         workers = 1
     
@@ -107,20 +110,21 @@ def cross_validation(workers: int, nFolder:int, modeLearn:ModeLearn, dataSet, f:
     future = list()
     with ProcessPoolExecutor(max_workers=min(workers,totalTheta)) as pool:
         for theta in dictionaries:
-            future.append(pool.submit(partial(cross_validation_iterator, nIter=10, workers=workers, nFolder=nFolder, dataSet=dataSet.copy(), f=f, theta=theta, startTime=startTime, errorFunct=errorFunct, modeLearn=modeLearn, miniBatchDim=miniBatchDim)))
+            future.append(pool.submit(partial(cross_validation_iterator, nIter=1, workers=workers, nFolder=nFolder, dataSet=dataSet.copy(), f=f, theta=theta, startTime=startTime, errorFunct=errorFunct, modeLearn=modeLearn, miniBatchDim=miniBatchDim, errorVlFunct=errorVlFunct, hiddenF=hiddenF)))
 
         for elem in future:
             res.append(elem.result())
 
     return res
     
-def cross_validation_iterator(workers: int, nFolder: int, dataSet, f:ActivFunct, theta:dict, startTime, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, nIter: int = 10):
+def cross_validation_iterator(workers: int, nFolder: int, dataSet, f:ActivFunct, theta:dict, startTime, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, nIter: int = 10, errorVlFunct = None, hiddenF: ActivFunct=None):
     errore = list()
     trErrorPlot = list()
     vlErrorPlot = list()
+    print("cross_validation_iterator")
     for i in range(0, nIter):
         
-        (err, trErr, vlErr) = k_fold_CV_single(nFolder,dataSet,f,theta,errorFunct,modeLearn,miniBatchDim)
+        (err, trErr, vlErr) = k_fold_CV_single(nFolder,dataSet,f,theta,errorFunct,modeLearn,miniBatchDim, errorVlFunct=errorVlFunct, hiddenF=hiddenF)
         errore.append(err)
         trErrorPlot.append(trErr.tolist())
         vlErrorPlot.append(vlErr.tolist())
@@ -169,7 +173,7 @@ Argomenti:
 - errorFunct, funzione di valutazione dell'errore;
 """
 
-def double_cross_validation(workers: int, testFolder: int, nFolder: int, dataSet, f:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:list, MaxEpochs:list, Tolerance:list, startTime, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None):
+def double_cross_validation(workers: int, testFolder: int, nFolder: int, dataSet, f:ActivFunct, learnRate:list, momRate:list, regRate:list, ValMax:list, HiddenUnits:list, OutputUnits:list, MaxEpochs:list, Tolerance:list, startTime, errorFunct = None, modeLearn:ModeLearn = ModeLearn.BATCH, miniBatchDim= None, errorVlFunct=None, hiddenF:ActivFunct = None):
     if testFolder <= 1:
         raise ValueError ("Wrong value of num. folders inserted")
 
@@ -200,9 +204,9 @@ def double_cross_validation(workers: int, testFolder: int, nFolder: int, dataSet
         for j in range(len(foldersCopy)):
             vlSet += foldersCopy[j]
 
-        e = cross_validation(workers,nFolder,modeLearn,vlSet,f,errorFunct,learnRate,momRate,regRate,ValMax,HiddenUnits,OutputUnits,MaxEpochs,Tolerance,startTime,miniBatchDim=miniBatchDim)
+        e = cross_validation(workers,nFolder,modeLearn,vlSet,f,errorFunct,learnRate,momRate,regRate,ValMax,HiddenUnits,OutputUnits,MaxEpochs,Tolerance,startTime,miniBatchDim=miniBatchDim, errorVlFunct=errorVlFunct, hiddenF=hiddenF)
         theta = getBestResult(e)[0]
-        nn = NeuralNetwork(vlSet,f,new_hyp=theta)
+        nn = NeuralNetwork(vlSet,f,new_hyp=theta, Hiddenf=hiddenF)
         (_,testErr,_,_)=nn.learn(modeLearn,errorFunct,miniBatchDim,testSet)
         errList.append(testErr[-1])
 
@@ -218,7 +222,7 @@ if __name__ == '__main__':
     """
     Test della cross-validation
     """
-    
+    """
     f = Sigmoidal(12)
 
     domains = [3, 3, 2, 3, 4, 2]
@@ -278,7 +282,7 @@ if __name__ == '__main__':
     
     
     print("Operazione di cross-validation conclusa in " + str(secdiff) + " secondi: i dati sono stati salvati in " + logFileName + ".")
-    
+    """
     """
     trError = np.array([0.16610955, 0.16094129, 0.15395562, 0.14815347, 0.14280768,
        0.1376045 , 0.13209849, 0.12650345, 0.12088108, 0.11538641,
@@ -553,3 +557,65 @@ if __name__ == '__main__':
     secdiff = stop - start
     print("Errore: " + str(e) + ", tempo: " + str(secdiff))
     """
+    
+
+    outputF = Identity()
+    hiddenf = ReLu()
+    skipRow = [1,2,3,4,5,6,7,8,9,10]
+    columnSkip = [1, 12]
+    target = [13]
+
+    trSet = DataSet("Z:\Matteo\Desktop\Machine Learning\ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
+    trSet.restrict(0,1)
+    learnRates = [0.001]
+    momRates = [0.7]
+    regRates = [0]
+    ValMaxs = [0.4]
+    HiddenUnitss = [50]
+    OutputUnitss = [1]
+    MaxIterss = [1000]
+    Tolerances = [0.03]
+    start = time.time()
+    e = cross_validation(1, 2, ModeLearn.BATCH, trSet.getInputs(), outputF, MEE, learnRates, momRates, regRates, ValMaxs, HiddenUnitss, OutputUnitss, MaxIterss, Tolerances, start, None, errorVlFunct=MEE, hiddenF=hiddenf)
+    stop = time.time() 
+    secdiff = stop - start
+
+    datasetFileName = "Z:\Matteo\Desktop\Machine Learning\ML-CUP18-TR.csv"
+    logFileName = datasetFileName + ".log"
+    log = open(logFileName,'a')
+    log.write("***\n")
+    log.write("File: " + datasetFileName + ", con configurazioni di iperparametri seguenti \n")
+    log.write("learnRates: " + str(learnRates))
+    log.write('\n')
+    log.write("momRates: " + str(momRates))
+    log.write('\n')
+    log.write("regRates: " + str(regRates))
+    log.write('\n')
+    log.write("ValMaxs: " + str(ValMaxs))
+    log.write('\n')
+    log.write("HiddenUnitss: " + str(HiddenUnitss))
+    log.write('\n')
+    log.write("OutputUnitss: " + str(OutputUnitss))
+    log.write('\n')
+    log.write("MaxIterss: " + str(MaxIterss))
+    log.write('\n')
+    log.write("Tolerances: " + str(Tolerances))
+    log.write('\n\n')
+
+    log.write("Operazione di cross-validation conclusa in " + str(secdiff) + " secondi, risultati:\n")
+
+    log.write(str(e) + '\n')
+    log.write('\n')
+    log.write("Miglior risultato: " + str(getBestResult(e)) + '\n')
+    log.write('\n\n')
+
+    log.close()
+
+    
+    for elem in e:
+        graphic.plot(elem[2], 'r--')#tr set
+        graphic.plot(elem[3], 'b')#vl set
+        graphic.show()
+    
+    
+    print("Operazione di cross-validation conclusa in " + str(secdiff) + " secondi: i dati sono stati salvati in " + logFileName + ".")

@@ -26,7 +26,7 @@ trSet.restrict(0,1)
 list_of_input_arrays = list()
 list_of_target_arrays = list()
 
-for i in range (0,50):
+for i in range (0,1016):
     elem = trSet.getInputs()[i]
     list_of_input_arrays.append(elem.getInput())
     list_of_target_arrays.append(elem.getTarget())
@@ -36,18 +36,24 @@ targets = np.array(list_of_target_arrays)
 
 print("TrSet completo")
 
-model = Sequential()
-model.add(Dense(units=500, activation='softplus', input_dim=10, kernel_regularizer=regularizers.l2(0)))
-model.add(Dense(units=2, activation='linear', kernel_regularizer=regularizers.l2(0)))
+lr = 2e-5
+decay = 0
+momentum = 0.9
+regularization = 0
+units = 300
 
-sgd = optimizers.SGD(lr=1e-4, decay=2e-9, momentum=0.9, nesterov=False)
+model = Sequential()
+model.add(Dense(units=units, activation='softplus', input_dim=10, kernel_regularizer=regularizers.l2(regularization)))
+model.add(Dense(units=2, activation='linear', kernel_regularizer=regularizers.l2(regularization)))
+
+sgd = optimizers.SGD(lr=lr, decay=decay, momentum=momentum, nesterov=False)
 model.compile(loss=euclidean_distance_loss, optimizer=sgd)
-history = model.fit(inputs, targets, epochs=400000, batch_size=len(inputs), verbose=1, shuffle=True)
+history = model.fit(inputs, targets, epochs=400000, batch_size=80, verbose=1, shuffle=True)
 
 # Plot training & validation accuracy values
 plt.plot(history.history['loss'])
 plt.title('Model loss')
 plt.ylabel('loss')
 plt.xlabel('Epoch')
-plt.legend(['Train'], loc='upper left')
+plt.legend(["lr="+str(lr)+" decay="+str(decay)+" momentum="+str(momentum)+" reg="+str(regularization)+" units="+str(units)], loc='upper left')
 plt.show()

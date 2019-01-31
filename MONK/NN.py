@@ -1,7 +1,5 @@
 """
-Classe NeuralNetwork che implementa il nostro modello di rete neurale,
-in particolare è utilizzato un algoritmo di apprendimento backpropagation di tipo
-batch.
+Classe NeuralNetwork che implementa il nostro modello di rete neurale.
 """
 from Input import OneOfKAttribute, Input, OneOfKInput, TRInput, OneOfKTRInput 
 from ActivFunct import ActivFunct, Sigmoidal, Identity, SoftPlus, SymmetricSigmoidal
@@ -21,9 +19,9 @@ class ModeLearn(Enum):
 class NeuralNetwork(object):
     
     #Da usare in fase di testing
-    #weights[0]: np.array, matrice dei pesi delle hidden unit
-    #weights[1]: np.array, matrice dei pesi delle output unit
-    #weights[:,0] colonna dei pesi di bias 
+    #weights[i]: np.array, matrice dei pesi della i+1-esima hidden unit
+    #weights[-1]: np.array, matrice dei pesi delle output unit
+    #weights[i][:,0] colonna dei pesi di bias 
     def __init__(self, trainingSet: list, Outputf : ActivFunct, new_hyp={}, weights:list = None, Hiddenf:ActivFunct = None):
         #Dizionario contenente i settaggi di default (ovviamente modificabili) 
         #degli iperparametri. 
@@ -31,6 +29,7 @@ class NeuralNetwork(object):
                     'momRate':   0.1,
                     'regRate':   0.1,
                     'ValMax':    0.2,
+                    'HiddenLayers': 1, 
                     'HiddenUnits':  2,
                     'OutputUnits':  1,
                     'MaxEpochs': 10e4,
@@ -74,25 +73,41 @@ class NeuralNetwork(object):
         #Generazione casuale (o inserimento, se passati al costruttore) dei pesi relativi alle unità.
         if weights == None:
             #Generazione casuale dei pesi con l'uso del fanIn.
-            rang = self.hyp['ValMax']*2/fanIn 
-            self.HiddenWeights = np.random.uniform(-rang,rang,(self.hyp['HiddenUnits'],length))
-            self.HiddenBias = np.random.uniform(-rang,rang,(self.hyp['HiddenUnits'],1))
+            #HiddenWeights/Bias: lista di array contenenti i pesi relativi agli HiddenLayers, si procede dall'interno
+            #verso l'esterno.
+            rang = self.hyp['ValMax']*2/fanIn
+
+            #Creazione dei pesi degli HiddenLayers.
+            self.HiddenWeights = list()
+            self.HiddenBias = list()
+            for i in range(self.hyp['HiddenLayers']):
+                self.HiddenWeights.append(np.random.uniform(-rang,rang,(self.hyp['HiddenUnits'],length)))
+                self.HiddenBias.append(np.random.uniform(-rang,rang,(self.hyp['HiddenUnits'],1)))
+                if i == 0:
+                    length = self.hyp['HiddenUnits']
+
+            #Creazione dei pesi dell'OutputLayer.
             self.OutputWeights = np.random.uniform(-rang,rang,(self.hyp['OutputUnits'],self.hyp['HiddenUnits']))
             self.OutputBias = np.random.uniform(-rang,rang,(self.hyp['OutputUnits'],1))
         else:
+            #Controllo validità dei pesi inseriti.
+            if len(weights) != self.hyp['HiddenLayers']+1:
+                raise ValueError ("NN, in __init__: wrong number of weights matrixes inserted")
+
             #Inserimento hidden weights e bias.
-            if isinstance(weights[0], np.array):
-                if weights[0].shape == (self.hyp['HiddenUnits'],length+1):
-                    self.HiddenWeights = weights[0][:,1:]
-                    self.HiddenBias = np.array([weights[0][:,0]]).transpose()
-                else:
-                    raise ValueError ("NN, in __init__: assigned hidden weights matrix not valid")
+            for i in range(self.hyp['HiddenLayers']):
+                if isinstance(weights[i], np.array):
+                    if weights[i].shape == (self.hyp['HiddenUnits'],length+1):
+                        self.HiddenWeights.append(weights[i][:,1:])
+                        self.HiddenBias.append(np.array([weights[i][:,0]]).transpose())
+                    else:
+                        raise ValueError ("NN, in __init__: assigned hidden weights matrix not valid")
 
             #Inserimento output weights e bias.
-            if isinstance(weights[1], np.array):
-                if weights[1].shape == (self.hyp['OutputUnits'],self.hyp['HiddenUnits']+1):
-                    self.OutputWeights = weights[1][:,1:]
-                    self.OutputBias = np.array([weights[0][:,0]]).transpose()
+            if isinstance(weights[-1], np.array):
+                if weights[-1].shape == (self.hyp['OutputUnits'],self.hyp['HiddenUnits']+1):
+                    self.OutputWeights = weights[-1][:,1:]
+                    self.OutputBias = np.array([weights[-1][:,0]]).transpose()
                 else:
                     raise ValueError ("NN, in __init__: assigned output weights matrix not valid")
 
@@ -109,9 +124,17 @@ class NeuralNetwork(object):
         TauLearnRate = self.hyp["TauLearnRate"]
 
         oldWeightsRatioOut = np.zeros((self.hyp['OutputUnits'], self.hyp['HiddenUnits']))
-        oldWeightsRatioHidden = np.zeros((self.hyp['HiddenUnits'], self.trainingSet[0].getLength()))
         oldratio_Bias_out = np.zeros((self.hyp['OutputUnits'], 1))
-        oldratio_Bias_hidden = np.zeros((self.hyp['HiddenUnits'], 1))
+
+        oldWeightsRatioHidden = list()
+        oldratio_Bias_hidden = list()
+        for i in range(self.hyp['HiddenLayers']):
+            dim1 = self.hyp['HiddenUnits']
+            dim2 = self.hyp['HiddenUnits']
+            if i == 0:
+                dim2 = self.trainingSet[0].getLength()
+            oldWeightsRatioHidden.append(np.zeros((dim1, dim2)))
+            oldratio_Bias_hidden.append(np.zeros((dim1, 1)))
 
         #Inizializzazione di contatori di epochs ed iterazioni.
         epochs = 0
@@ -251,23 +274,28 @@ class NeuralNetwork(object):
             oldWeightsRatioOut = ratio_W_Out
             oldratio_Bias_out = ratio_Bias_out
 
-            oldWeightsRatioHidden = ratio_W_Hidden
-            oldratio_Bias_hidden = ratio_Bias_hidden
+            for i in range(self.hyp['HiddenLayers']):
+                oldWeightsRatioHidden[i] = ratio_W_Hidden[i]
+                oldratio_Bias_hidden[i] = ratio_Bias_hidden[i]
 
         return (vecErr,vecVlErr,vecAcc,vecVlAcc)
         
 
     
     #Se full == False, resituisce gli output di rete (array dei valori uscenti dalle unità di output) dato l'input inp;
-    #se full == True, restituisce gli array di output e net di output layer, output e net di hidden layer.
+    #se full == True, restituisce gli array di output e net di output layer, le liste di output e net degli hidden layers.
     def getOutput(self, inp:Input, full:bool=False):
 
         #Calcolo gli outputs (ed eventuali nets) delle hidden units
-        hiddenNets = np.dot(self.HiddenWeights,inp.getInput()) + self.HiddenBias.transpose()[0]
-        inp2hidd = self.Hiddenf.getf(hiddenNets)
+        hiddenNets = list()
+        inp2hidd = list()
+        inp2hidd.append(inp.getInput())
+        for i in range(self.hyp['HiddenLayers']):
+            hiddenNets.append(np.dot(self.HiddenWeights[i],inp2hidd[i]) + self.HiddenBias[i].transpose()[0])
+            inp2hidd.append(self.Hiddenf.getf(hiddenNets[i]))
 
         #Calcolo gli outputs (ed eventuali nets) di rete
-        outputNets = np.dot(self.OutputWeights,inp2hidd) + self.OutputBias.transpose()[0]
+        outputNets = np.dot(self.OutputWeights,inp2hidd[-1]) + self.OutputBias.transpose()[0]
         hidd2out = self.Outputf.getf(outputNets)
 
         if full:
@@ -319,14 +347,21 @@ class NeuralNetwork(object):
         b2 = isinstance(inp, OneOfKTRInput)
 
         if b1 or b2:
-            #Calcolo gli outputs di rete, le nets dell'outputLayer e hiddenLayer.
-            (Outputs,OutputNet,OutputsHidden,HiddenNet) = self.getOutput(inp,full=True)
+            #Calcolo gli outputs di rete, le nets dell'outputLayer e degli hiddenLayer.
+            (Outputs,OutputNet,OutputsHidden,HiddenNets) = self.getOutput(inp,full=True)
 
             #Calcolo i delta relativi alle output units.
             deltaOutResults = (inp.getTarget() - Outputs) * self.Outputf.getDerivative(OutputNet)
 
-            #Calcolo i delta relativi alle hidden units.
-            deltaHiddenResults = np.dot(deltaOutResults,self.OutputWeights) * self.Hiddenf.getDerivative(HiddenNet)
+            #Calcolo i delta relativi alle hidden units. (La notazione l[::-1] inverte la posizione degli elementi in una lista)
+            HiddenNets = HiddenNets[::-1]
+            deltaHiddenResults = list()
+            deltaHiddenResults.append(deltaOutResults)
+            currentWeights = self.OutputWeights
+            for i in range(self.hyp['HiddenLayers']):
+                deltaHiddenResults.append(np.dot(deltaHiddenResults[i],currentWeights) * self.Hiddenf.getDerivative(HiddenNets[i]))
+                currentWeights = self.HiddenWeights[self.hyp['HiddenLayers']-1-i]
+            deltaHiddenResults = deltaHiddenResults[1:][::-1]
 
         else:
             raise ValueError ("in getDeltas: inserted non-targeted input.")
@@ -338,9 +373,9 @@ class NeuralNetwork(object):
 
     -arguments
         oldWeightsRatioOut: np.array delle variazioni dei pesi delle unità di output all'iterazione precedente
-        oldWeightsRatioHidden: np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
+        oldWeightsRatioHidden: lista (per hidden layer) di np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
         oldBiasRatioOut: np.array delle variazioni dei bias delle unità di output all'iterazione precedente
-        oldBiasRatioOut: np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
+        oldBiasRatioHidden: lista (per hidden layer) np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
         learnRate: learning rate
         momRate: alfa del momentum
         regRate: lambda della regolarizzazione
@@ -352,42 +387,56 @@ class NeuralNetwork(object):
     def batchIter(self, oldWeightsRatioOut: np.array, oldWeightsRatioHidden: np.array, oldBiasRatioOut: np.array, oldBiasRatioHidden: np.array, learnRate, momRate, regRate):
 
         ratio_W_Out = np.zeros((self.hyp['OutputUnits'], self.hyp['HiddenUnits']))
-        ratio_W_Hidden = np.zeros((self.hyp['HiddenUnits'], self.trainingSet[0].getLength()))
         ratio_Bias_out = np.zeros((self.hyp['OutputUnits'], 1))
-        ratio_Bias_hidden = np.zeros((self.hyp['HiddenUnits'], 1))
+
+        ratio_W_Hidden = list()
+        ratio_Bias_hidden = list()
+        for i in range(self.hyp['HiddenLayers']):
+            dim1 = self.hyp['HiddenUnits']
+            dim2 = self.hyp['HiddenUnits']
+            if i == 0:
+                dim2 = self.trainingSet[0].getLength()
+            ratio_W_Hidden.append(np.zeros((dim1, dim2)))
+            ratio_Bias_hidden.append(np.zeros((dim1, 1)))
 
         #scorro sugli input
         for inp in self.trainingSet:
             #Calcolo dei valori delta.
-            (hiddenOutResults, deltaOutResults,deltaHiddenResults) = self.getDeltas(inp)
+            (hiddenOutResults,deltaOutResults,deltaHiddenResults) = self.getDeltas(inp)
         
             #Aggiornamento dei ratios relativi a pesi e bias dello hidden layer.
-            inputsMatrix = np.dot(np.ones((self.hyp['HiddenUnits'],1)),np.array([inp.getInput()]))
-            ratio_W_Hidden += learnRate*np.dot(np.diag(deltaHiddenResults),inputsMatrix)
-            ratio_Bias_hidden += learnRate*np.array([deltaHiddenResults]).transpose()
+            for i in range(self.hyp['HiddenLayers']):
+                inputsMatrix = np.dot(np.ones((self.hyp['HiddenUnits'],1)),np.array([hiddenOutResults[i]]))
+                ratio_W_Hidden[i] += learnRate*np.dot(np.diag(deltaHiddenResults[i]),inputsMatrix)
+                ratio_Bias_hidden[i] += learnRate*np.array([deltaHiddenResults[i]]).transpose()
 
             #Aggiornamento dei ratios relativi a pesi e bias dello output layer.
-            hiddOutputsMatrix = np.dot(np.ones((self.hyp['OutputUnits'],1)),np.array([hiddenOutResults]))
+            hiddOutputsMatrix = np.dot(np.ones((self.hyp['OutputUnits'],1)),np.array([hiddenOutResults[-1]]))
             ratio_W_Out += learnRate*np.dot(np.diag(deltaOutResults),hiddOutputsMatrix)
             ratio_Bias_out += learnRate*np.array([deltaOutResults]).transpose()
             
+        #Riscalamento del gradiente.
         ratio_W_Out /= len(self.trainingSet)
-        ratio_W_Hidden /= len(self.trainingSet)
         ratio_Bias_out /= len(self.trainingSet)
-        ratio_Bias_hidden /= len(self.trainingSet)
+        for i in range(self.hyp['HiddenLayers']):
+            ratio_W_Hidden[i] /= len(self.trainingSet)
+            ratio_Bias_hidden[i] /= len(self.trainingSet)
 
+        #Aggiunta della componente momentum.
         ratio_W_Out += momRate * oldWeightsRatioOut
-        ratio_W_Hidden += momRate * oldWeightsRatioHidden
         ratio_Bias_out += momRate * oldBiasRatioOut
-        ratio_Bias_hidden += momRate * oldBiasRatioHidden
+        for i in range(self.hyp['HiddenLayers']):
+            ratio_W_Hidden[i] += momRate * oldWeightsRatioHidden[i]
+            ratio_Bias_hidden[i] += momRate * oldBiasRatioHidden[i]
 
         #aggiornamento pesi unità di output
         self.OutputWeights = self.OutputWeights + ratio_W_Out - regRate*self.OutputWeights
         self.OutputBias = self.OutputBias + ratio_Bias_out
 
         #aggiornamento pesi unità hidden layer
-        self.HiddenWeights = self.HiddenWeights + ratio_W_Hidden - regRate*self.HiddenWeights
-        self.HiddenBias = self.HiddenBias + ratio_Bias_hidden
+        for i in range(self.hyp['HiddenLayers']):
+            self.HiddenWeights[i] = self.HiddenWeights[i] + ratio_W_Hidden[i] - regRate*self.HiddenWeights[i]
+            self.HiddenBias[i] = self.HiddenBias[i] + ratio_Bias_hidden[i]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
     
@@ -396,9 +445,9 @@ class NeuralNetwork(object):
 
     -arguments
         oldWeightsRatioOut: np.array delle variazioni dei pesi delle unità di output all'iterazione precedente
-        oldWeightsRatioHidden: np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
+        oldWeightsRatioHidden: lista (per hidden layer) di np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
         oldBiasRatioOut: np.array delle variazioni dei bias delle unità di output all'iterazione precedente
-        oldBiasRatioOut: np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
+        oldBiasRatioHidden: lista (per hidden layer) di np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
         minBatch: mini-batch corrente
         impCoeff: coefficiente di importanza del mini-batch corrente in relazione alla sua dimensione rispetto
                   agli altri mini-batches 
@@ -413,42 +462,56 @@ class NeuralNetwork(object):
     def miniBatchIter(self, oldWeightsRatioOut: np.array, oldWeightsRatioHidden: np.array, oldBiasRatioOut: np.array, oldBiasRatioHidden: np.array, minBatch: list, impCoeff: float, learnRate, momRate, regRate):
 
         ratio_W_Out = np.zeros((self.hyp['OutputUnits'], self.hyp['HiddenUnits']))
-        ratio_W_Hidden = np.zeros((self.hyp['HiddenUnits'], self.trainingSet[0].getLength()))
         ratio_Bias_out = np.zeros((self.hyp['OutputUnits'], 1))
-        ratio_Bias_hidden = np.zeros((self.hyp['HiddenUnits'], 1))
+
+        ratio_W_Hidden = list()
+        ratio_Bias_hidden = list()
+        for i in range(self.hyp['HiddenLayers']):
+            dim1 = self.hyp['HiddenUnits']
+            dim2 = self.hyp['HiddenUnits']
+            if i == 0:
+                dim2 = self.trainingSet[0].getLength()
+            ratio_W_Hidden.append(np.zeros((dim1, dim2)))
+            ratio_Bias_hidden.append(np.zeros((dim1, 1)))
 
         #scorro sugli input
         for inp in minBatch:
             #Calcolo dei valori delta.
             (hiddenOutResults, deltaOutResults,deltaHiddenResults) = self.getDeltas(inp)
         
-            #Aggiornamento dei ratios relativi a pesi e bias dello hidden layer.
-            inputsMatrix = np.dot(np.ones((self.hyp['HiddenUnits'],1)),np.array([inp.getInput()]))
-            ratio_W_Hidden += learnRate*np.dot(np.diag(deltaHiddenResults),inputsMatrix)
-            ratio_Bias_hidden += learnRate*np.array([deltaHiddenResults]).transpose()
+            #Aggiornamento dei ratios relativi a pesi e bias degli hidden layers.
+            for i in range(self.hyp['HiddenLayers']):
+                inputsMatrix = np.dot(np.ones((self.hyp['HiddenUnits'],1)),np.array([hiddenOutResults[i]]))
+                ratio_W_Hidden[i] += learnRate*np.dot(np.diag(deltaHiddenResults[i]),inputsMatrix)
+                ratio_Bias_hidden[i] += learnRate*np.array([deltaHiddenResults[i]]).transpose()
 
             #Aggiornamento dei ratios relativi a pesi e bias dello output layer.
-            hiddOutputsMatrix = np.dot(np.ones((self.hyp['OutputUnits'],1)),np.array([hiddenOutResults]))
+            hiddOutputsMatrix = np.dot(np.ones((self.hyp['OutputUnits'],1)),np.array([hiddenOutResults[-1]]))
             ratio_W_Out += learnRate*np.dot(np.diag(deltaOutResults),hiddOutputsMatrix)
             ratio_Bias_out += learnRate*np.array([deltaOutResults]).transpose()
-            
+        
+        #Riscalamento del gradiente.
         ratio_W_Out /= len(minBatch)
-        ratio_W_Hidden /= len(minBatch)
         ratio_Bias_out /= len(minBatch)
-        ratio_Bias_hidden /= len(minBatch)
+        for i in range(self.hyp['HiddenLayers']):
+            ratio_W_Hidden[i] /= len(minBatch)
+            ratio_Bias_hidden[i] /= len(minBatch)
 
+        #Aggiunta della componente momentum.
         ratio_W_Out += momRate * oldWeightsRatioOut
-        ratio_W_Hidden += momRate * oldWeightsRatioHidden
         ratio_Bias_out += momRate * oldBiasRatioOut
-        ratio_Bias_hidden += momRate * oldBiasRatioHidden
+        for i in range(self.hyp['HiddenLayers']):
+            ratio_W_Hidden[i] += momRate * oldWeightsRatioHidden[i]
+            ratio_Bias_hidden[i] += momRate * oldBiasRatioHidden[i]
 
         #aggiornamento pesi unità di output
         self.OutputWeights = self.OutputWeights + ratio_W_Out - regRate*self.OutputWeights
         self.OutputBias = self.OutputBias + ratio_Bias_out
 
         #aggiornamento pesi unità hidden layer
-        self.HiddenWeights = self.HiddenWeights + ratio_W_Hidden - regRate*self.HiddenWeights
-        self.HiddenBias = self.HiddenBias + ratio_Bias_hidden
+        for i in range(self.hyp['HiddenLayers']):
+            self.HiddenWeights[i] = self.HiddenWeights[i] + ratio_W_Hidden[i] - regRate*self.HiddenWeights[i]
+            self.HiddenBias[i] = self.HiddenBias[i] + ratio_Bias_hidden[i]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
 
@@ -457,9 +520,9 @@ class NeuralNetwork(object):
 
     -arguments
         oldWeightsRatioOut: np.array delle variazioni dei pesi delle unità di output all'iterazione precedente
-        oldWeightsRatioHidden: np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
+        oldWeightsRatioHidden: lista (per hidden layer) degli np.array delle variazioni dei pesi delle unità hidden all'iterazione precedente
         oldBiasRatioOut: np.array delle variazioni dei bias delle unità di output all'iterazione precedente
-        oldBiasRatioOut: np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
+        oldBiasRatioHidden: lista (per hidden layer) np.array delle variazioni dei bias delle unità hidden all'iterazione precedente
         inp: input corrente
         learnRate: learning rate
         momRate: alfa del momentum
@@ -472,35 +535,47 @@ class NeuralNetwork(object):
     def onlineIter(self, oldWeightsRatioOut: np.array, oldWeightsRatioHidden: np.array, oldBiasRatioOut: np.array, oldBiasRatioHidden: np.array, inp, learnRate, momRate, regRate):
 
         ratio_W_Out = np.zeros((self.hyp['OutputUnits'], self.hyp['HiddenUnits']))
-        ratio_W_Hidden = np.zeros((self.hyp['HiddenUnits'], self.trainingSet[0].getLength()))
         ratio_Bias_out = np.zeros((self.hyp['OutputUnits'], 1))
-        ratio_Bias_hidden = np.zeros((self.hyp['HiddenUnits'], 1))
+
+        ratio_W_Hidden = list()
+        ratio_Bias_hidden = list()
+        for i in range(self.hyp['HiddenLayers']):
+            dim1 = self.hyp['HiddenUnits']
+            dim2 = self.hyp['HiddenUnits']
+            if i == 0:
+                dim2 = self.trainingSet[0].getLength()
+            ratio_W_Hidden.append(np.zeros((dim1, dim2)))
+            ratio_Bias_hidden.append(np.zeros((dim1, 1)))
 
         #Calcolo dei valori delta.
         (hiddenOutResults,deltaOutResults,deltaHiddenResults) = self.getDeltas(inp)
         
-        #Aggiornamento dei ratios relativi a pesi e bias dello hidden layer.
-        inputsMatrix = np.dot(np.ones((self.hyp['HiddenUnits'],1)),np.array([inp.getInput()]))
-        ratio_W_Hidden += learnRate*np.dot(np.diag(deltaHiddenResults),inputsMatrix)
-        ratio_Bias_hidden += learnRate*np.array([deltaHiddenResults]).transpose()
+        #Aggiornamento dei ratios relativi a pesi e bias degli hidden layers.
+        for i in range(self.hyp['HiddenLayers']):
+                inputsMatrix = np.dot(np.ones((self.hyp['HiddenUnits'],1)),np.array([hiddenOutResults[i]]))
+                ratio_W_Hidden[i] += learnRate*np.dot(np.diag(deltaHiddenResults[i]),inputsMatrix)
+                ratio_Bias_hidden[i] += learnRate*np.array([deltaHiddenResults[i]]).transpose()
 
         #Aggiornamento dei ratios relativi a pesi e bias dello output layer.
-        hiddOutputsMatrix = np.dot(np.ones((self.hyp['OutputUnits'],1)),np.array([hiddenOutResults]))
+        hiddOutputsMatrix = np.dot(np.ones((self.hyp['OutputUnits'],1)),np.array([hiddenOutResults[-1]]))
         ratio_W_Out += learnRate*np.dot(np.diag(deltaOutResults),hiddOutputsMatrix)
         ratio_Bias_out += learnRate*np.array([deltaOutResults]).transpose()
         
+        #Aggiunta della componente momentum
         ratio_W_Out = (1 - momRate)*ratio_W_Out + momRate * oldWeightsRatioOut
-        ratio_W_Hidden = (1 - momRate)*ratio_W_Hidden + momRate * oldWeightsRatioHidden
         ratio_Bias_out = (1-momRate)*ratio_Bias_out + momRate * oldBiasRatioOut
-        ratio_Bias_hidden = (1-momRate)*ratio_Bias_hidden + momRate * oldBiasRatioHidden
+        for i in range(self.hyp['HiddenLayers']):
+            ratio_W_Hidden[i] = (1 - momRate)*ratio_W_Hidden[i] + momRate * oldWeightsRatioHidden[i]
+            ratio_Bias_hidden[i] = (1-momRate)*ratio_Bias_hidden[i] + momRate * oldBiasRatioHidden[i]
 
         #aggiornamento pesi unità di output
         self.OutputWeights = self.OutputWeights + ratio_W_Out - regRate*self.OutputWeights
         self.OutputBias = self.OutputBias + ratio_Bias_out
 
         #aggiornamento pesi unità hidden layer
-        self.HiddenWeights = self.HiddenWeights + ratio_W_Hidden - regRate*self.HiddenWeights
-        self.HiddenBias = self.HiddenBias + ratio_Bias_hidden
+        for i in range(self.hyp['HiddenLayers']):
+            self.HiddenWeights[i] = self.HiddenWeights[i] + ratio_W_Hidden[i] - regRate*self.HiddenWeights[i]
+            self.HiddenBias[i] = self.HiddenBias[i] + ratio_Bias_hidden[i]
 
         return (ratio_W_Out, ratio_W_Hidden, ratio_Bias_out, ratio_Bias_hidden)
 
@@ -570,26 +645,52 @@ def MEE(target,output):
     return linalg.norm(target - output,2)
 
 outputF = Identity()
-hiddenf = SoftPlus()
+hiddenf = SymmetricSigmoidal(10,2)
 skipRow = [1,2,3,4,5,6,7,8,9,10]
 columnSkip = [1]
 target = [12,13]
 
 trSet = DataSet("ML-CUP18-TR.csv", ",", ModeInput.TR_INPUT, target, None, skipRow, columnSkip)
-cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenUnits':70, 'learnRate':0.01, 'TauEpoch':20000, 'TauLearnRate':0.0001, 'ValMax':1, 'momRate':0.5, 'regRate':0, 'Tolerance':0.5, 'MaxEpochs': 60000}, Hiddenf=hiddenf)
+
+random.shuffle(trSet.inputList)
+tSet = trSet.inputList[0:9*len(trSet.inputList)//10]
+vlSet = trSet.inputList[9*len(trSet.inputList)//10:]
+cupNN = NeuralNetwork(tSet, outputF, {'OutputUnits':2, 'HiddenLayers':2, 'HiddenUnits':20, 'learnRate':0.005, 'TauEpoch':1, 'TauLearnRate':0.005, 'ValMax':1, 'momRate':0.5, 'regRate':1e-10, 'Tolerance':0.01, 'MaxEpochs': 25000}, Hiddenf=hiddenf)
+
+"""
+cupNN = NeuralNetwork(trSet.inputList, outputF, {'OutputUnits':2, 'HiddenLayers':2, 'HiddenUnits':100, 'learnRate':0.005, 'TauEpoch':1, 'TauLearnRate':0.0005, 'ValMax':1, 'momRate':0.7, 'regRate':0, 'Tolerance':0.01, 'MaxEpochs': 100000}, Hiddenf=hiddenf)
+"""
+
 print("Learning...")
 start = time.time()
-(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.MINIBATCH, numMiniBatches=8, errorFunct=MEE, verbose=True)
+(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.BATCH, validationSet=vlSet, errorFunct=MEE, verbose=True)
+
+"""
+(errtr, errvl, acctr, accvl) = cupNN.learn(ModeLearn.BATCH, errorFunct=MEE, verbose=True)
+"""
+
 end = time.time()
 print("Errore ultima epoch: " + str(errtr[-1]))
 print("Tempo: "+str(end-start))
 
-out = open('mlcupresSP_HU70_LR1e-2to1e-4_EP60k_MB8', 'a')
+out = open('mlcupresSS10,2_HL2_HU20_LR5e-3_RG1e-10_EP25k', 'a')
 for el in errtr:
     out.write(str(el)+",")
 out.write("\n")
 out.close()
 
-graphic.grid(True)
-graphic.plot(errtr)
+out = open('mlcupresSS10,2_HL2_HU20_LR5e-3_RG1e-10_EP25k[vlSet]', 'a')
+for el in errvl:
+    out.write(str(el)+",")
+out.write("\n")
+out.close()
+
+graphic.axis((0,25000,0,2))
+graphic.grid()
+graphic.title('SymmetricSigmoidal10,2 HU:20x2HL LR:5e-3 mom:0.5 RG:1e-10')
+graphic.plot(errtr,color='blue',label='training')
+graphic.plot(errvl,'--',color='red',label='test')
+graphic.legend()
 graphic.show()
+
+
